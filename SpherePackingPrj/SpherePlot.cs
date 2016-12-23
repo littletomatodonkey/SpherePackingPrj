@@ -11,12 +11,23 @@ namespace SpherePacking.MainWindow
 {
     class SpherePlot
     {
-        private int numOfSpheres;
+        /// <summary>
+        /// 小球的球心在每个网格点上的x、y、z每个单独方向上的最大偏移和最小偏移之差
+        /// 小球的半径的最大值 Rmax = 0.5 - MaxCenterBias/2;
+        /// example : 
+        ///     网格点是(0,0,0)，则小球的球心的范围是(-0.1,-0.1,-0.1) ~ (0.1,0.1,0.1)
+        ///     小球的半径的最大值是 0.4
+        /// </summary>
+        private const double MaxCenterBias = 0.2;
+
 
         /// <summary>
-        /// z方向上的小球的个数与x、y方向上的小球个数之比
+        /// 小球的半径的最大偏差（相对于0.5）
+        /// 小球的半径范围是 [0.5-MaxRadiusBias ~ 0.5]*Rmax/0.5
+        /// example :
+        ///     假设小球的最大半径是0.4，则小球的半径的范围是 0.24 ~ 0.4
         /// </summary>
-        private int zRate;
+        private const double MaxRadiusBias = 0.2;
 
         /// <summary>
         /// 图像中存储的小球，可以直接对小球的半径以及位置等进行操作，再对控件进行刷新，即可实时更新小球位置及大小
@@ -39,105 +50,100 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 初始化SpherePlot对象
         /// </summary>
-        /// <param name="num"></param>
-        public SpherePlot(int num, int zrate)
+        public SpherePlot()
         {
-            this.numOfSpheres = num * num * num * zrate;
-            this.spheres = new vtkSphereSource[numOfSpheres];
-            this.zRate = zrate;
-            int index = 0;
-
-            for (int i = 0; i < num; i++)
+            switch( PackingSystemSetting.SystemBoundType )
             {
-                for (int j = 0; j < num; j++)
-                {
-                    for (int k = 0; k < zRate * num; k++)
-                    {
-                        spheres[index] = vtkSphereSource.New();
-                        spheres[index].SetRadius(ComputeRandomRadius());
-
-                        spheres[index].SetCenter(i + 0.3 + 0.4 * rnd.NextDouble(),
-                                                j + 0.3 + 0.4 * rnd.NextDouble(),
-                                                k + 0.3 + 0.4 * rnd.NextDouble());
-                        //设置小球的可视化精度，精度越高，渲染越慢；精度越低，效果越差。
-                        spheres[index].SetPhiResolution(20);
-                        spheres[index++].SetThetaResolution(20);
-                    }
-                }
+                case BoundType.CubeType:
+                    InitializeSpheres(PackingSystemSetting.CubeLength / 2, PackingSystemSetting.CubeLength/2);
+                    break;
+                case BoundType.CylinderType:
+                    int len =  (int)(PackingSystemSetting.Radius / Math.Sqrt(2));
+                    InitializeSpheres( len, 0 );
+                    break;
+                default:
+                    break;
             }
-
-            
         }
 
-        public SpherePlot(double radius, double height)
+        /// <summary>
+        /// 初始化小球的位置和半径
+        /// </summary>
+        /// <param name="len">立方体的边长的一半</param>
+        /// <param name="offset">对于原圆柱体，底面圆心为零位；对于立方体，底面左下点为零位</param>
+        private void InitializeSpheres(int len, int offset)
         {
-            this.numOfSpheres = (int)(3*radius*radius/4/Math.Pow(0.5,3));
-            this.spheres = new vtkSphereSource[numOfSpheres];
+            this.spheres = new vtkSphereSource[PackingSystemSetting.BallsNumber];
             int index = 0;
-            double h = 1.0;
-            while(index < numOfSpheres)
+            int h = 0;
+            int min = -len;
+            int max = len;
+            if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
             {
-                int min = (int)(-radius/Math.Sqrt(2));
-                int max = (int)(radius/Math.Sqrt(2));
-                for(int i=min;i<=max;i+=2)
+                max = PackingSystemSetting.CubeLength + min;
+            }
+            
+
+            while (index < PackingSystemSetting.BallsNumber)
+            {
+                for (int i = min + offset; i < max + offset; i += 1)
                 {
-                    for(int j=min;j<=max;j+=2)
+                    for (int j = min + offset; j < max + offset; j += 1)
                     {
                         spheres[index] = vtkSphereSource.New();
                         spheres[index].SetRadius(ComputeRandomRadius());
-                        spheres[index].SetCenter( i+0.2*(rnd.NextDouble()-0.5), 
-                                                  j+0.2*(rnd.NextDouble()-0.5),
-                                                  h + 0.2 * (rnd.NextDouble() - 0.5));
+                        spheres[index].SetCenter(i + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + 0.5, 
+                                                 j + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + 0.5, 
+                                                 h + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + 0.5);
 
                         spheres[index].SetPhiResolution(20);
                         spheres[index++].SetThetaResolution(20);
 
-                        if(index >= numOfSpheres)
+                        if (index >= PackingSystemSetting.BallsNumber)
                         {
                             break;
                         }
                     }
-                    if (index >= numOfSpheres)
+                    if (index >= PackingSystemSetting.BallsNumber)
                     {
                         break;
                     }
                 }
-                h = h + 1.4;
+                h = h + 1;
             }
-
         }
 
         /// <summary>
         /// 计算小球的半径
-        /// 小球半径符合对数正态分布，之后需要修改这个函数
+        /// 小球的半径的最大值 Rmax = 0.5 - MaxCenterBias/2, 确保在一个单位1的立方体内不会重叠
+        /// 此处设置的是均匀随机分布，小球半径符合还可能符合对数正态分布等
+        /// ----> to be improved
         /// </summary>
         /// <returns></returns>
         private double ComputeRandomRadius()
         {
-            if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
-                return (0.4 + rnd.NextDouble() * 0.2) / 1.5;
-            else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
-                return (0.3 + 0.4 * rnd.NextDouble());
-            else
-                return 0.0;
+            //小球的半径是：[0.5-MaxRadiusBias ~ 0.5]*Rmax/0.5
+            return (0.5 - MaxRadiusBias + MaxRadiusBias * rnd.NextDouble()) * (0.5 - MaxCenterBias / 2) / 0.5;
         }
 
         /// <summary>
         /// 在renderer上绘制小球
         /// </summary>
         /// <param name="renderer"></param>
-        public void PlotSphereInRender( vtkRenderer renderer )
+        public void PlotSphereInRender( vtkRenderer renderer, ref vtkActorCollection actors )
         {
             if (this.spheres == null)
                 return;
-            for (int i = 0; i < numOfSpheres;i++ )
+            for (int i = 0; i < PackingSystemSetting.BallsNumber; i++)
             {
                 vtkPolyDataMapper mapper = vtkPolyDataMapper.New();
                 mapper.SetInputConnection(spheres[i].GetOutputPort());
                 vtkActor actor = vtkActor.New();
                 actor.SetMapper(mapper);
-                renderer.AddActor(actor);
+                actors.AddItem( actor );
+                //renderer.AddActor(actor);
             }
+
         }
 
         /// <summary>
@@ -215,7 +221,7 @@ namespace SpherePacking.MainWindow
         /// <returns></returns>
         private Matrix<double> ComputeDistanceMatrix()
         {
-            Matrix<double> dists = new Matrix<double>(numOfSpheres, numOfSpheres);
+            Matrix<double> dists = new Matrix<double>(PackingSystemSetting.BallsNumber, PackingSystemSetting.BallsNumber);
             for (int i = 0; i < spheres.Length; i++)
             {
                 for (int j = 0; j < spheres.Length; j++)
@@ -236,7 +242,7 @@ namespace SpherePacking.MainWindow
         /// <returns></returns>
         public double ComputeDistanceTwoPoints(int i, int j)
         {
-            if (i >= numOfSpheres || j >= numOfSpheres)
+            if (i >= PackingSystemSetting.BallsNumber || j >= PackingSystemSetting.BallsNumber)
                 return -1;
             return Math.Sqrt(Math.Pow((spheres[i].GetCenter()[0] - spheres[j].GetCenter()[0]), 2) +
                               Math.Pow((spheres[i].GetCenter()[1] - spheres[j].GetCenter()[1]), 2) +
@@ -252,7 +258,7 @@ namespace SpherePacking.MainWindow
         public bool IsTwoSpheresIntersect(int i, int j)
         {
             //这里的Error还没有考虑进去
-            if (i >= numOfSpheres || j >= numOfSpheres)
+            if (i >= PackingSystemSetting.BallsNumber || j >= PackingSystemSetting.BallsNumber)
                 return false;
             return Math.Sqrt(Math.Pow((spheres[i].GetCenter()[0] - spheres[j].GetCenter()[0]), 2) +
                               Math.Pow((spheres[i].GetCenter()[1] - spheres[j].GetCenter()[1]), 2) +

@@ -39,8 +39,9 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 绘制立方体的边缘
         /// </summary>
-        /// <param name="renderer"></param>
-        public void PlotEdge(vtkRenderer renderer, byte[] bgColor)
+        /// <param name="bgColor">边缘的颜色</param>
+        /// <param name="actors">添加至该对象</param>
+        public void AddContainerEdgeToActorCollection(byte[] bgColor, ref vtkActorCollection actors)
         {
             vtkPoints points = vtkPoints.New();
             points.InsertNextPoint(0 + offset[0], 0 + offset[1], 0 + offset[2]);
@@ -96,10 +97,11 @@ namespace SpherePacking.MainWindow
             vtkActor actor = vtkActor.New();
             actor.SetMapper(mapper);
             actor.GetProperty().SetLineWidth(3);
+
+            actors.AddItem(actor);
             
             Marshal.FreeHGlobal(iColor);
 
-            renderer.AddActor(actor);
         }
 
     }

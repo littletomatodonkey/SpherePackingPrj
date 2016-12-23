@@ -23,6 +23,11 @@ namespace SpherePacking.MainWindow
         public RefreshWindowHandler RefreshHandler;
 
         /// <summary>
+        /// Here is the once-per-class call to initialize the log object
+        /// </summary>
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+        /// <summary>
         /// 迭代的采样时间，stepsize
         /// </summary>
         private const double deltaT = 4e-3; //para before is 4e-3
@@ -63,14 +68,20 @@ namespace SpherePacking.MainWindow
         private const double knw = 1e2;
 
         /// <summary>
-        /// 小球膨胀后的速度衰减指数
+        /// 小球碰撞后的速度衰减指数
         /// </summary>
         private const double velDecayRate = 1.0 / 2;
 
         /// <summary>
         /// 迭代的次数
         /// </summary>
-        private const int iteration = 8000;
+        private int iteration
+        {
+            get
+            {
+                return PackingSystemSetting.IterationNum;
+            }
+        }
 
         /// <summary>
         /// 在每次迭代过程中求解出的孔隙率
@@ -119,21 +130,14 @@ namespace SpherePacking.MainWindow
         private Matrix<double> rtAcc;
 
         /// <summary>
+        /// 系统的能量(动能+重力势能)
+        /// </summary>
+        Matrix<double> energy;
+
+        /// <summary>
         /// 用于产生随机数
         /// </summary>
         private Random random = new Random();
-
-        /// <summary>
-        /// 用于保存数据文件的文件夹
-        /// </summary>
-        private const string dirForSaveInfo = "./result/";
-
-        /// <summary>
-        /// 设置每一边的小球的个数
-        /// 初始化小球的位置时会用到
-        /// 容器的边长是这个rate倍
-        /// </summary>
-        private int nBase;
 
         #region 属性值
         public int ObjNum
@@ -165,21 +169,25 @@ namespace SpherePacking.MainWindow
             get { return this.rtAcc; }
             private set { this.rtAcc = value; }
         }
+
+        public Matrix<double> Energy
+        {
+            get { return this.energy; }
+            private set { this.energy = value; }
+        }
         #endregion
 
-        public ModelDem3D( int nbase, SpherePlot balls, SimpleModelForSave sModel = null )
+        public ModelDem3D(SpherePlot balls, SimpleModelForSave sModel = null )
         {
             this.objNum = balls.Spheres.Count();
             this.porosity = new Matrix<double>(iteration, 1);
-
 
             InitStatus(balls);
 
             if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
             {
-                this.nBase = nbase;
                 kns = 1e1;
-                cubeBound = new CubeBound(nbase, nbase, nbase);
+                cubeBound = new CubeBound(PackingSystemSetting.CubeLength, PackingSystemSetting.CubeLength, PackingSystemSetting.CubeLength);
             }
             else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
             {
@@ -202,6 +210,7 @@ namespace SpherePacking.MainWindow
             rtPos = new Matrix<double>(objNum, dim);
             rtVel = new Matrix<double>(objNum, dim);
             rtAcc = new Matrix<double>(objNum, dim);
+            energy = new Matrix<double>(iteration, 1);
             for (int i = 0; i < objNum; i++)
             {
                 radii[i, 0] = balls.Spheres[i].GetRadius();
@@ -220,6 +229,7 @@ namespace SpherePacking.MainWindow
         {
             Stopwatch sw = new Stopwatch();
             sw.Start();
+            
             for(int i=0;i<iteration;i++)
             {
                 ComputePos();
@@ -228,6 +238,10 @@ namespace SpherePacking.MainWindow
                 ComputeAcc();
                 //ApplySaturationAcc();
                 porosity[i, 0] = ComputePorosity(1e0);
+                energy[i, 0] = ComputeEnergy();
+                string s = String.Format("current iteration : {0:D4}, system energy : {1:F4}, elapsed time : {2} ms", 
+                                    i, energy[i,0], sw.ElapsedMilliseconds );
+                log.Info( s );
                 //if( i % 20 == 0 )
                 if(true)
                 {
@@ -235,11 +249,12 @@ namespace SpherePacking.MainWindow
                 }
             }
 
-            DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt",dirForSaveInfo, rtPos);
-            DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", dirForSaveInfo, rtVel);
-            DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", dirForSaveInfo, rtAcc);
-            DataReadWriteHelper.RecordInfo("porosity" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", dirForSaveInfo, porosity);
-            DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", dirForSaveInfo, radii);
+            DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt",PackingSystemSetting.ResultDir, rtPos);
+            DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, rtVel);
+            DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, rtAcc);
+            DataReadWriteHelper.RecordInfo("porosity" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, porosity);
+            DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, radii);
+            DataReadWriteHelper.RecordInfo("energy" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, energy);
 
             sw.Stop();
 
@@ -279,7 +294,7 @@ namespace SpherePacking.MainWindow
         }
 
         /// <summary>
-        /// 计算角实时加速度
+        /// 计算实时加速度
         /// </summary>
         private void ComputeAcc()
         {
@@ -319,9 +334,9 @@ namespace SpherePacking.MainWindow
                             force[i, 0] += knw * (-rtPos[i, 0] + radii[i, 0]);
                             rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
                         }
-                        if (rtPos[i, 0] + radii[i, 0] > nBase)
+                        if (rtPos[i, 0] + radii[i, 0] > PackingSystemSetting.CubeLength)
                         {
-                            force[i, 0] += knw * (nBase - rtPos[i, 0] - radii[i, 0]);
+                            force[i, 0] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 0] - radii[i, 0]);
                             rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
                         }
                         if (rtPos[i, 1] - radii[i, 0] < 0)
@@ -329,9 +344,9 @@ namespace SpherePacking.MainWindow
                             force[i, 1] += knw * (-rtPos[i, 1] + radii[i, 0]);
                             rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
                         }
-                        if (rtPos[i, 1] + radii[i, 0] > nBase)
+                        if (rtPos[i, 1] + radii[i, 0] > PackingSystemSetting.CubeLength)
                         {
-                            force[i, 1] += knw * (nBase - rtPos[i, 1] - radii[i, 0]);
+                            force[i, 1] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 1] - radii[i, 0]);
                             rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
                         }
                         if (rtPos[i, 2] - radii[i, 0] < 0)
@@ -423,9 +438,9 @@ namespace SpherePacking.MainWindow
                             force[i, 0] += knw * (-rtPos[i, 0] + radii[i, 0]);
                             rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
                         }
-                        if (rtPos[i, 0] + radii[i, 0] > nBase)
+                        if (rtPos[i, 0] + radii[i, 0] > PackingSystemSetting.CubeLength)
                         {
-                            force[i, 0] += knw * (nBase - rtPos[i, 0] - radii[i, 0]);
+                            force[i, 0] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 0] - radii[i, 0]);
                             rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
                         }
                         if (rtPos[i, 1] - radii[i, 0] < 0)
@@ -433,9 +448,9 @@ namespace SpherePacking.MainWindow
                             force[i, 1] += knw * (-rtPos[i, 1] + radii[i, 0]);
                             rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
                         }
-                        if (rtPos[i, 1] + radii[i, 0] > nBase)
+                        if (rtPos[i, 1] + radii[i, 0] > PackingSystemSetting.CubeLength)
                         {
-                            force[i, 1] += knw * (nBase - rtPos[i, 1] - radii[i, 0]);
+                            force[i, 1] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 1] - radii[i, 0]);
                             rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
                         }
                         if (rtPos[i, 2] - radii[i, 0] < 0)
@@ -668,6 +683,24 @@ namespace SpherePacking.MainWindow
                 rtPos[i, 2] = balls.Spheres[i].GetCenter()[2];
             }
         }
+
+        /// <summary>
+        /// 计算目前小球的能量
+        /// 动能+重力势能
+        /// </summary>
+        /// <returns></returns>
+        private double ComputeEnergy()
+        {
+            double energy = 0.0;
+
+            for (int i = 0; i < mass.Rows;i++ )
+            {
+                energy += 0.5 * mass[i, 0] * rtVel.GetRow(i).Norm + mass[i, 0] * gravity * (RtPos[i, 2]-radii[i,0]);
+            }
+
+            return energy;
+        }
+        
     }
 
     /// <summary>
@@ -704,7 +737,6 @@ namespace SpherePacking.MainWindow
                 this.RtVel = model.RtVel;
                 this.RtAcc = model.RtAcc;
             }
-            
         }
     }
 }

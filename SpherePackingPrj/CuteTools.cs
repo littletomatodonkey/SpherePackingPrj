@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Kitware.VTK;
 using Emgu.CV;
 using Emgu.CV.Structure;
+using System.Threading;
 
 namespace SpherePacking.MainWindow
 {
@@ -63,6 +64,8 @@ namespace SpherePacking.MainWindow
         }
 
         /// <summary>
+        /// 
+        /// <summary>
         /// 用体绘制的方法绘制一系列的图像
         /// </summary>
         /// <param name="format">图像文件的字符串格式</param>
@@ -70,9 +73,10 @@ namespace SpherePacking.MainWindow
         /// <param name="width">高度</param>
         /// <param name="startIndex">起始index</param>
         /// <param name="endIndex">末尾index</param>
+        /// <param name="r">renderer，如果非空，则将其体绘制结果添加到这里面来</param>
         /// example:
         ///     CuteTools.ShowImageSeries(@"initial/%03d.bmp",64, 64, 0, 62);
-        public static void ShowImageSeries(string format, int height, int width, int startIndex, int endIndex)
+        public static void ShowImageSeries(string format, int height, int width, int startIndex, int endIndex, vtkRenderer r = null)
         {
             if (format == null || format.Count() <= 4 || (!format.Substring(format.Count() - 3, 3).Equals("bmp")))
             {
@@ -88,10 +92,8 @@ namespace SpherePacking.MainWindow
             reader.SetDataScalarTypeToUnsignedChar();
             reader.Update();
 
-            
-
             vtkVolume vol = vtkVolume.New();
-            vtkRenderer render = vtkRenderer.New();
+            
             vtkFixedPointVolumeRayCastMapper texMapper = vtkFixedPointVolumeRayCastMapper.New();
 
             texMapper.SetInput(reader.GetOutput());
@@ -112,24 +114,33 @@ namespace SpherePacking.MainWindow
             compositeOpacity.AddPoint(255, 0.2);
             compositeOpacity.ClampingOn();
             vpro.SetScalarOpacity(compositeOpacity);
-            vpro.SetColor( colorTransferFunction );
+            //vpro.SetColor( colorTransferFunction );
             vpro.SetInterpolationTypeToLinear();
             //vpro.ShadeOn();
             vol.SetProperty(vpro);   
 
-            render.AddVolume(vol);
-            render.SetBackground(1, 1, 1);
+            if( r != null )
+            {
+                r.AddVolume(vol);
+            }
+            else
+            {
+                vtkRenderer render = vtkRenderer.New();
+                render.AddVolume(vol);
+                render.SetBackground(1, 1, 1);
 
-            vtkRenderWindow wnd = vtkRenderWindow.New();
-            wnd.AddRenderer(render);
+                vtkRenderWindow wnd = vtkRenderWindow.New();
+                wnd.AddRenderer(render);
 
+                vtkRenderWindowInteractor inter = vtkRenderWindowInteractor.New();
+                inter.SetRenderWindow(wnd);
 
-            vtkRenderWindowInteractor inter = vtkRenderWindowInteractor.New();
-            inter.SetRenderWindow(wnd);
-
-            inter.Initialize();
-            inter.Start();
+                inter.Initialize();
+                inter.Start();
+            }
+            
         }
+
 
     }
 }

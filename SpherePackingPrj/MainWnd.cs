@@ -21,25 +21,10 @@ namespace SpherePacking.MainWindow
 {
     public partial class MainWnd : Form
     {
-
-        //Here is the once-per-class call to initialize the log object
+        /// <summary>
+        /// Here is the once-per-class call to initialize the log object
+        /// </summary>
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
-        /// <summary>
-        /// 每个边上小球的个数
-        /// 相当于立方体容器的边长
-        /// </summary>
-        private const int N_BASE = 10;
-
-        /// <summary>
-        /// Z方向上的小球的个数与x、y方向上的小球的个数的比
-        /// </summary>
-        private const int Z_RATE = 2;
-
-        /// <summary>
-        /// 在区域内放置的小球的个数
-        /// </summary>
-        private const int NUM_SPHERE = N_BASE * N_BASE * N_BASE;
 
         /// <summary>
         /// 窗体中的renderer
@@ -66,7 +51,28 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private Thread solveThread;
 
+        /// <summary>
+        /// 用于计时
+        /// </summary>
         private Stopwatch stopWatch = new Stopwatch();
+
+        private vtkActorCollection actorCollection = new vtkActorCollection();
+
+        /// <summary>
+        /// 主线程的ID号
+        /// </summary>
+        private static int mainThreadID;
+
+        /// <summary>
+        /// 判断当前线程是否为主线程
+        /// </summary>
+        private bool IsMainThread
+        {
+            get
+            {
+                return mainThreadID == Thread.CurrentThread.ManagedThreadId;
+            }
+        }
 
         #region resize窗口时用到的变量
         /// <summary>
@@ -84,9 +90,6 @@ namespace SpherePacking.MainWindow
         private int initFormSizeWidth;//用以存储窗体原始的水平尺寸
         private int initFormSizeHeight;//用以存储窗体原始的垂直尺寸
 
-        //private double FormSizeChangedX;//用以存储相关父窗体/容器的水平变化量
-        //private double FormSizeChangedY;//用以存储相关父窗体/容器的垂直变化量 
-
         private int gResizeCnt = 0;//为防止递归遍历控件时产生混乱，故专门设定一个全局计数器
         #endregion
 
@@ -94,25 +97,41 @@ namespace SpherePacking.MainWindow
         {
             InitializeComponent();
 
-            #region 初始化resize相关的变量
-            GetInitialFormSize();
+            InitializeFormSize();
 
-            GetAllCtrlLocation(this);
-            GetAllCtrlSize(this);
-            #endregion
+            log4net.Config.BasicConfigurator.Configure(new log4net.Appender.FileAppender(new log4net.Layout.PatternLayout("%date [%thread] %level %logger line%L - %message%newline%exception"),
+                                String.Format("{0}log-{1}.log", PackingSystemSetting.LogDir, DateTime.Now.ToString("yyyyMMdd-HHmmss")), false));
+            mainThreadID = Thread.CurrentThread.ManagedThreadId;
+            ImportSystemSettings();
 
-            
         }
+
+
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            renderer = vtkRenderer.New();
-            renderer = rwcVolumeDisp.RenderWindow.GetRenderers().GetFirstRenderer(); //将此renderer和显示的窗体控件相关联
-            renderer.SetBackground(0.7, 0.7, 0.7); //设置背景
+            InitializeSystem();
+        }
 
-            cbBoundType.SelectedIndex = 0;
+        /// <summary>
+        /// 初始化小球堆积系统
+        /// 在寻找窗口中RenderWindowControl时，需要通过遍历的方式去寻找，因为在修改配置信息之后，需要在窗口中重新添加这个控件
+        /// </summary>
+        private void InitializeSystem()
+        {
+            foreach (Control c in this.Controls)
+            {
+                if (c.GetType() == rwcVolumeDisp.GetType())
+                {
+                    renderer = (c as RenderWindowControl).RenderWindow.GetRenderers().GetFirstRenderer(); //将此renderer和显示的窗体控件相关联
+                    renderer.ResetCamera();
+                    renderer.RemoveAllLights();
+                    renderer.SetBackground(0.7, 0.7, 0.7); //设置背景
+                    AddLightToRenderer(renderer);
+                    SetCameraToRenderer(renderer);
+                }
+            }
 
-            InitToolTipSetting();
             switch (PackingSystemSetting.SystemBoundType)
             {
                 case BoundType.CubeType:
@@ -125,24 +144,47 @@ namespace SpherePacking.MainWindow
                     break;
             }
 
-            modelDem3D = new ModelDem3D(N_BASE, balls);
+            //添加Actors到renderer中，用于显示
+            while (actorCollection.GetNumberOfItems() != 0)
+            {
+                renderer.AddActor(actorCollection.GetLastActor());
+                actorCollection.RemoveItem(actorCollection.GetLastActor());
+            }
+
+            modelDem3D = new ModelDem3D(balls);
             modelDem3D.RefreshHandler = new ModelDem3D.RefreshWindowHandler(RefreshWindow);
 
-            AddLightToRenderer(renderer);
-            SetCameraToRenderer(renderer);
-
-            rwcVolumeDisp.Refresh();
-
             GenerateDirsIfNotExist();
+        }
 
+        /// <summary>
+        /// 在系统启动时导入系统设置
+        /// 文件的路径为："./result/global-settings.json"
+        /// 若文件不存在，则导入默认配置
+        /// </summary>
+        private void ImportSystemSettings()
+        {
+            PackSysSettingForSave setting;
+            setting = DataReadWriteHelper.LoadSimpleModelFromFile<PackSysSettingForSave>("./result/global-settings.json");
+            if (setting == null)
+            {
+                string info = "packing system settings file not found! choose the default settings";
+                log.Warn(info);
+                ShowText( info, IsMainThread );
+            }
+            else
+            {
+                setting.ExportToSysSetting();
+            }
         }
 
         /// <summary>
         /// 生成存储相关信息的文件夹
+        /// 如果是多级路径，则也会依次新建
         /// </summary>
         private void GenerateDirsIfNotExist()
         {
-            if( !Directory.Exists(PackingSystemSetting.ResultDir) )
+            if (!Directory.Exists(PackingSystemSetting.ResultDir))
             {
                 Directory.CreateDirectory(PackingSystemSetting.ResultDir);
             }
@@ -158,19 +200,6 @@ namespace SpherePacking.MainWindow
             }
         }
 
-        /// <summary>
-        /// 初始化tooltip
-        /// </summary>
-        private void InitToolTipSetting()
-        {
-            ttShowInfo.SetToolTip(this.btnLoadSpheresJson, "从json文件中导入小球的半径和位置信息");
-            ttShowInfo.SetToolTip(this.btnSaveSpheres, "将小球信息保存到文件中");
-            ttShowInfo.SetToolTip(this.btnSaveImg, "保存当前rendererwindow到图像中");
-            ttShowInfo.SetToolTip(this.btnSinter, "模拟烧结过程，将每个小圆的半径设增大为原来的1.2倍");
-            ttShowInfo.SetToolTip(this.btnSolveProblem, "求解问题");
-            ttShowInfo.SetToolTip(this.btnTest, "测试按钮，用于测试函数功能");
-            ttShowInfo.SetToolTip(this.btnGenerateSlices, "将当前容器中的小球信息生成切片(图像序列)");
-        }
 
         /// <summary>
         /// 定时测试，可以看出直接修改spheres的属性再刷新即可
@@ -188,18 +217,18 @@ namespace SpherePacking.MainWindow
         /// 设置renderer中的light
         /// </summary>
         /// <param name="renderer"></param>
-        private void AddLightToRenderer( vtkRenderer renderer )
+        private void AddLightToRenderer(vtkRenderer renderer)
         {
             vtkLight light1 = vtkLight.New();
             light1.SetColor(0, 1, 0);
-            light1.SetPosition(-N_BASE, -N_BASE, -N_BASE);
+            light1.SetPosition(-PackingSystemSetting.CubeLength, -PackingSystemSetting.CubeLength, -PackingSystemSetting.CubeLength);
             light1.SetFocalPoint(renderer.GetActiveCamera().GetFocalPoint()[0],
                                 renderer.GetActiveCamera().GetFocalPoint()[1],
                                 renderer.GetActiveCamera().GetFocalPoint()[2]);
 
             vtkLight light2 = vtkLight.New();
             light2.SetColor(0, 0, 1);
-            light2.SetPosition(N_BASE*2, N_BASE*2, N_BASE*2);
+            light2.SetPosition(PackingSystemSetting.CubeLength * 2, PackingSystemSetting.CubeLength * 2, PackingSystemSetting.CubeLength * 2);
             light2.SetFocalPoint(renderer.GetActiveCamera().GetFocalPoint()[0],
                                 renderer.GetActiveCamera().GetFocalPoint()[1],
                                 renderer.GetActiveCamera().GetFocalPoint()[2]);
@@ -216,24 +245,23 @@ namespace SpherePacking.MainWindow
         {
             vtkCamera camera = vtkCamera.New();
             camera.SetClippingRange(0.0475, 2.3786);
-            camera.SetPosition(-N_BASE, -N_BASE, N_BASE * 3);
+            camera.SetPosition(-PackingSystemSetting.CubeLength, -PackingSystemSetting.CubeLength, PackingSystemSetting.CubeLength * 3);
             //camera.ComputeViewPlaneNormal();
             //camera.SetViewUp(10, 10, 0);
-            renderer.SetActiveCamera( camera );
+            renderer.SetActiveCamera(camera);
         }
 
         /// <summary>
         /// 向renderer中添加坐标轴
         /// </summary>
         /// <param name="renderer"></param>
-        private void AddCoordianteToRenderer(vtkRenderer renderer )
+        private void AddCoordianteToActorCollection(ref vtkActorCollection actors)
         {
             vtkCubeAxesActor axes = vtkCubeAxesActor.New();
-            axes.SetCamera( renderer.GetActiveCamera() );
-            axes.SetBounds(0,N_BASE,0,N_BASE,0,N_BASE);
-            axes.SetOrigin(0,0,0);
-            
-            renderer.AddActor( axes );
+            axes.SetCamera(renderer.GetActiveCamera());
+            axes.SetBounds(0, PackingSystemSetting.CubeLength, 0, PackingSystemSetting.CubeLength, 0, PackingSystemSetting.CubeLength);
+            axes.SetOrigin(0, 0, 0);
+            actors.AddItem(axes);
         }
 
         /// <summary>
@@ -241,64 +269,31 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private void RefreshWindow(int iter, Matrix<double> pos)
         {
-            log.Info("current iteration : " + iter);
-            //Console.WriteLine("current iteration : " + iter);
-            for (int i = 0; i < balls.Spheres.Count();i++ )
+            Console.WriteLine("current iteration : " + iter);
+            for (int i = 0; i < balls.Spheres.Count(); i++)
             {
                 //Console.WriteLine("%dth sphere pos: (" + pos[i, 0] + ", " + +pos[i, 1] + ", " + pos[i, 2] + ")");
-                balls.SetCenter(pos[i,0], pos[i,1], pos[i,2], i);
+                balls.SetCenter(pos[i, 0], pos[i, 1], pos[i, 2], i);
             }
 
-            if( (iter+1) % 100 == 0 )
+            if ((iter + 1) % 1 == 0)
+            //if( false )
             {
-                DataReadWriteHelper.SaveModelDemAsSimple(modelDem3D, String.Format("./result/ballsInfo{0}_{1}.json", PackingSystemSetting.SystemBoundType, DateTime.Now.ToString("yyyyMMdd-HHmmss")));
+                DataReadWriteHelper.SaveObjAsJsonFile(new SimpleModelForSave(modelDem3D), String.Format("{0}/ballsInfo{1}_{2:D4}.json", PackingSystemSetting.ResultDir, PackingSystemSetting.SystemBoundType, iter));
             }
 
             try
             {
-                this.Invoke((EventHandler)(delegate
-                {
-                    //rwcVolumeDisp.Refresh();
-                    tbStatus.Text = "iteration : " + iter;
-                    //SaveRendererAsPic(String.Format("./result/iter{0:D5}.png", iter));
-
-                }));
+                ShowText("iteration : " + iter, IsMainThread);
+                RefreshRenderWindowCtrl( IsMainThread );
+                //SaveRendererAsPic(String.Format("./result/iter{0:D5}.png", iter));
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 log.Error(ex);
-                Console.WriteLine("Thread has been aborted at iteration : " + iter);
-                //Console.WriteLine(ex.ToString());
+                ShowText( String.Format("error : {0}\r\nThread has been aborted at iteration : {1}", ex.ToString(), iter), 
+                    IsMainThread );
             }
-            
-        }
-
-        /// <summary>
-        /// 开始或者停止求解DEM问题
-        /// 此处开启线程，防止主界面在求解过程中被卡死
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void btnSolveProblem_Click(object sender, EventArgs e)
-        {
-            //有时不是Running，而是WaitSleepJoin，需要查一下
-            if ((solveThread != null) && (solveThread.ThreadState == System.Threading.ThreadState.Running || solveThread.ThreadState == System.Threading.ThreadState.WaitSleepJoin))
-            {
-                btnSolveProblem.Text = "求解问题";
-                solveThread.Abort();
-                    
-            }
-            else
-            {
-                //在异步线程中启动程序，可以防止解算时界面卡死的情况
-                ThreadStart ts = new ThreadStart(delegate { modelDem3D.SolveProblem(); });
-                solveThread = new Thread(ts);
-                solveThread.Start();
-                btnSolveProblem.Text = "停止求解";
-            }
-
-            Console.WriteLine(solveThread.ThreadState);
-            
         }
 
         /// <summary>
@@ -308,23 +303,24 @@ namespace SpherePacking.MainWindow
         /// <param name="e"></param>
         private void MainWnd_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if( solveThread != null)
+            log.Info("program is being closed...");
+            if (solveThread != null)
             {
                 Console.WriteLine("in : " + solveThread.ThreadState);
-                if( ( solveThread.ThreadState == System.Threading.ThreadState.WaitSleepJoin
-                                       ||solveThread.ThreadState == System.Threading.ThreadState.Running
-                                       ||solveThread.ThreadState == System.Threading.ThreadState.Suspended) )
+                if ((solveThread.ThreadState == System.Threading.ThreadState.WaitSleepJoin
+                                       || solveThread.ThreadState == System.Threading.ThreadState.Running
+                                       || solveThread.ThreadState == System.Threading.ThreadState.Suspended))
                 {
-
                     solveThread.Abort();
                     solveThread.Join();
                     Console.WriteLine(solveThread.ThreadState);
                 }
             }
+            //System.Environment.Exit(0);
         }
 
         /// <summary>
-        /// 以png形式存储当前窗口的状态
+        /// 以png形式存储当前RenderWindowControl窗口的状态
         /// </summary>
         /// <param name="fn"></param>
         /// <returns></returns>
@@ -332,38 +328,42 @@ namespace SpherePacking.MainWindow
         {
             bool res = true;
 
-            vtkWindowToImageFilter screenShot = vtkWindowToImageFilter.New();
-            screenShot.SetInput( rwcVolumeDisp.RenderWindow );
-            //screenShot.SetMagnification(3);
-            screenShot.SetInputBufferTypeToRGB();
-            screenShot.ReadFrontBufferOff();
-            screenShot.Update();
+            RenderWindowControl rwc = new RenderWindowControl();
+            foreach (Control c in this.Controls)
+            {
+                if ((rwc = (c as RenderWindowControl)) != null)
+                {
+                    vtkWindowToImageFilter screenShot = vtkWindowToImageFilter.New();
+                    screenShot.SetInput(rwc.RenderWindow);
+                    //screenShot.SetMagnification(3);
+                    screenShot.SetInputBufferTypeToRGB();
+                    screenShot.ReadFrontBufferOff();
+                    screenShot.Update();
 
-            vtkPNGWriter writer = vtkPNGWriter.New();
-            writer.SetFileName( fn );
-            writer.SetInputConnection( screenShot.GetOutputPort() );
-            writer.Write();
-
+                    vtkPNGWriter writer = vtkPNGWriter.New();
+                    writer.SetFileName(fn);
+                    writer.SetInputConnection(screenShot.GetOutputPort());
+                    writer.Write();
+                }
+            }
             return res;
         }
-
-
 
         /// <summary>
         /// 初始化边界为立方体的情况
         /// </summary>
         private void InitStatusForCube()
         {
-            balls = new SpherePlot(N_BASE, Z_RATE);
-            balls.PlotSphereInRender(renderer);
+            balls = new SpherePlot();
+            balls.PlotSphereInRender(renderer, ref actorCollection);
 
-            CubeEdgePlot edgePlot = new CubeEdgePlot(N_BASE, 2 * N_BASE);
-            edgePlot.PlotEdge(renderer, new byte[] { 255, 0, 0 });
+            CubeEdgePlot edgePlot = new CubeEdgePlot(PackingSystemSetting.CubeLength, 2 * PackingSystemSetting.CubeLength);
+            edgePlot.AddContainerEdgeToActorCollection(new byte[] { 255, 0, 0 }, ref actorCollection);
 
-            cubeSurfacePlot = new CubeSurfacePlot(N_BASE);
+            cubeSurfacePlot = new CubeSurfacePlot(PackingSystemSetting.CubeLength);
             //cubeSurfacePlot.PlotSurfaceAll(renderer);
 
-            AddCoordianteToRenderer(renderer);
+            AddCoordianteToActorCollection(ref actorCollection);
         }
 
         /// <summary>
@@ -371,16 +371,15 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private void InitStatusForCylinder()
         {
-            balls = new SpherePlot(PackingSystemSetting.Radius, PackingSystemSetting.Height);
-            balls.PlotSphereInRender( renderer );
+            balls = new SpherePlot();
+            balls.PlotSphereInRender(renderer, ref actorCollection);
 
             //标准参数应该是100，40
-            CylinderEdgePlot plot = new CylinderEdgePlot( PackingSystemSetting.Radius, PackingSystemSetting.Height );
+            CylinderEdgePlot plot = new CylinderEdgePlot(PackingSystemSetting.Radius, PackingSystemSetting.Height);
             plot.PlotCylinderEdge(renderer, new byte[] { 255, 0, 0 });
-
         }
 
-#region 窗体Resize相关
+        #region 窗体Resize相关
         private void MainWnd_SizeChanged(object sender, EventArgs e)
         {
             gResizeCnt = 0;
@@ -407,6 +406,23 @@ namespace SpherePacking.MainWindow
                 this.AutoScroll = false;
                 ResetAllCrlState(this);
             }
+        }
+
+        /// <summary>
+        /// 初始化关于窗口resize相关的变量
+        /// 因为RenderWindow需要重新添加，因此首先需要清空之前保存的信息
+        /// </summary>
+        private void InitializeFormSize()
+        {
+            initialCrlName.Clear();
+            ctrlLocationX.Clear();
+            ctrlLocationY.Clear();
+            ctrlSizeWidth.Clear();
+            ctrlSizeHeight.Clear();
+
+            GetInitialFormSize();
+            GetAllCtrlLocation(this);
+            GetAllCtrlSize(this);
         }
 
         /// <summary>
@@ -472,74 +488,9 @@ namespace SpherePacking.MainWindow
                 gResizeCnt++;
             }
         }
-#endregion
-
+        #endregion
 
         #region Event handler
-        private void cbBoundType_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        /// <summary>
-        /// 模拟烧结过程
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void btnSinter_Click(object sender, EventArgs e)
-        {
-            if( balls != null )
-            {
-                SinteringHelper.SinteringProcess(balls);
-                rwcVolumeDisp.Refresh();
-            }
-        }
-
-        /// <summary>
-        /// 将小球信息导入文件中
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void btnSaveSpheres_Click(object sender, EventArgs e)
-        {
-            if( balls != null )
-            {
-                DataReadWriteHelper.SaveModelDemAsSimple(modelDem3D, String.Format("./result/ballsInfo{0}_{1}.json", PackingSystemSetting.SystemBoundType, DateTime.Now.ToString("yyyyMMdd-HHmmss")));
-            }
-            else
-            {
-                log.Warn("balls is null now!!");
-            }
-        }
-
-        /// <summary>
-        /// 从json文件中导入小球信息
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void btnLoadSpheresJson_Click(object sender, EventArgs e)
-        {
-            SimpleModelForSave sModel;
-            openFiledDlg.InitialDirectory = System.Environment.CurrentDirectory +  "\\result";
-            openFiledDlg.Filter = "json file|*.json";
-            if( openFiledDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            {
-                DataReadWriteHelper.LoadSimpleModelFromFile(openFiledDlg.FileName, out sModel);
-                if (sModel != null && sModel.Radii.Rows == balls.Spheres.Count())
-                {
-                    balls.ReloadInfo(sModel);
-                    modelDem3D.UpdateBallInfo(balls);
-                    rwcVolumeDisp.Refresh();
-                }
-                else
-                {
-                    log.Warn("file error or number of balls is not corrent");
-                    MessageBox.Show("file error or number of balls is not corrent");
-                }
-            }
-            
-        }
-
         /// <summary>
         /// 测试按钮，用于测试一些函数的功能等
         /// </summary>
@@ -547,39 +498,181 @@ namespace SpherePacking.MainWindow
         /// <param name="e"></param>
         private void btnTest_Click(object sender, EventArgs e)
         {
-            CuteTools.ShowImageSeries(@"D:/MyDesktop/imgSlice/%04d.bmp", 100, 100, 0, 99);
+            //CuteTools.ShowImageSeries(@"./humanThreeDim/H1010202__rec_dpn/final/%03d.bmp", 64, 64, 0, 63);
+            Console.WriteLine( IsMainThread );
         }
 
-        private void btnSaveImg_Click(object sender, EventArgs e)
+        private void tmiSettings_Click(object sender, EventArgs e)
         {
-            SaveRendererAsPic(String.Format("./result/screenshot{0}.png",DateTime.Now.ToString("yyyyMMddHHmmss")));
+            GlobalSettingsWnd settingsWnd = new GlobalSettingsWnd();
+            settingsWnd.ReloadSystemSetting += ReloadSystemSetting;
+            settingsWnd.ShowDialog();
         }
-
 
         /// <summary>
-        /// 生成测试图片
+        /// 回放功能
+        ///     读取系列小球的位置信息文件并按照一定时间间隔进行更新
+        ///     因为回放界面会卡死，因此将其放在一个线程中执行，保证界面可以被操作
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void btnGenerateSlices_Click(object sender, EventArgs e)
+        private void tmiPlayback_Click(object sender, EventArgs e)
         {
-            double xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmin = 0, zmax = 0, m = 0.1;
-            if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
+            FolderBrowserDialog dialog = new FolderBrowserDialog();
+            dialog.Description = "选择小球信息所在的文件夹";
+            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                xmin = N_BASE * m;
-                xmax = N_BASE * (1 - m);
+                ThreadStart ts = new ThreadStart(delegate 
+                    {
+                        PlayBack( dialog.SelectedPath );
+                    });
+                Thread th = new Thread(ts);
+                th.IsBackground = true;
+                th.Start();
+            }
+        }
 
-                ymin = N_BASE * m;
-                ymax = N_BASE * (1 - m);
+        /// <summary>
+        /// 模拟小球的烧结过程
+        /// 方法：将小球的半径按照一定的比例进行增大，使小球之间相交
+        ///     to be done : 实际的烧结过程中，小球的半径的扩大方法需要改变，或者可以缩小小球所在的空间，使得小球相交等
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiSimulateSinter_Click(object sender, EventArgs e)
+        {
+            if (balls != null)
+            {
+                SinteringHelper.SinteringProcess(balls);
+                rwcVolumeDisp.Refresh();
+            }
+        }
+
+        /// <summary>
+        /// 可视化切片图像序列
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiVisualzieSlices_Click(object sender, EventArgs e)
+        {
+            //在异步线程中启动程序，可以防止解算时界面卡死的情况
+            VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 0, 62, @"initial/%03d.bmp");
+            vwnd.Show();
+        }
+
+        /// <summary>
+        /// 保存设置到文件
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiSaveSettings_Click(object sender, EventArgs e)
+        {
+            DataReadWriteHelper.SaveObjAsJsonFile(new PackSysSettingForSave(), PackingSystemSetting.SettingFilename);
+        }
+
+        /// <summary>
+        /// 保存小球的半径、位置、速度、加速度、能量信息
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiSaveBallsInfo_Click(object sender, EventArgs e)
+        {
+            if (balls != null)
+            {
+                DataReadWriteHelper.SaveObjAsJsonFile(new SimpleModelForSave(modelDem3D), String.Format("./result/ballsInfo{0}_{1}.json", PackingSystemSetting.SystemBoundType, DateTime.Now.ToString("yyyyMMdd-HHmmss")));
+                DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtPos);
+                DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtVel);
+                DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtAcc);
+                DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Radii);
+                DataReadWriteHelper.RecordInfo("energy" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Energy);
+            }
+            else
+            {
+                string warning = "balls is null now!!";
+                log.Warn(warning);
+                ShowText(warning, IsMainThread);
+            }
+        }
+
+        /// <summary>
+        /// 将当前RenderWindowControl中的图像保存至png文件中
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiSaveCurrentRenderer_Click(object sender, EventArgs e)
+        {
+            string info;
+            string fn = String.Format("{0}screenshot{1}.png", PackingSystemSetting.ResultDir, DateTime.Now.ToString("yyyyMMhh-HHmmss"));
+            if (SaveRendererAsPic(fn))
+            {
+                info = String.Format("renderer screenshot has been saved successfully, name is {0}", fn);
+                log.Info(info);
+            }
+            else
+            {
+                info = String.Format("renderer screenshot has failed to be saved..");
+                log.Warn(info);
+            }
+            ShowText(info, IsMainThread);
+        }
+
+        /// <summary>
+        /// 从json文件中导入小球信息
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiImportBallsInfo_Click(object sender, EventArgs e)
+        {
+            SimpleModelForSave sModel;
+            openFiledDlg.InitialDirectory = System.Environment.CurrentDirectory + "\\result";
+            openFiledDlg.Filter = "json file|*.json";
+            if (openFiledDlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                sModel = DataReadWriteHelper.LoadSimpleModelFromFile<SimpleModelForSave>(openFiledDlg.FileName);
+                if (sModel != null && sModel.Radii.Rows == balls.Spheres.Count())
+                {
+                    balls.ReloadInfo(sModel);
+                    modelDem3D.UpdateBallInfo(balls);
+                    rwcVolumeDisp.Refresh();
+                    string info = String.Format("import balls info from {0}, reload info successfully!", openFiledDlg.FileName);
+                    log.Info(info);
+                    ShowText( info, IsMainThread );
+                }
+                else
+                {
+                    string warning = "file error or number of balls is not correct";
+                    log.Warn(warning);
+                    ShowText(warning, IsMainThread);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 将当前的三维小球堆积结果保存为切片图像系列
+        /// 将小球内部的点视为固体相，小球外部的点视为孔隙相
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiGenerateImageSlices_Click(object sender, EventArgs e)
+        {
+            ///m是
+            double xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmin = 0, zmax = 0, m = 0.1;
+            if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
+            {
+                xmin = PackingSystemSetting.CubeLength * m;
+                xmax = PackingSystemSetting.CubeLength * (1 - m);
+
+                ymin = PackingSystemSetting.CubeLength * m;
+                ymax = PackingSystemSetting.CubeLength * (1 - m);
 
                 zmin = 0;
-                zmax = N_BASE / (1 - 2 * m);
+                zmax = PackingSystemSetting.CubeLength / (1 - 2 * m);
             }
-            else if( PackingSystemSetting.SystemBoundType == BoundType.CylinderType )
+            else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
             {
                 m = Math.Sqrt(2) / 2;
                 xmin = -PackingSystemSetting.Radius * m;
-                xmax =  PackingSystemSetting.Radius * m;
+                xmax = PackingSystemSetting.Radius * m;
 
                 ymin = -PackingSystemSetting.Radius * m;
                 ymax = PackingSystemSetting.Radius * m;
@@ -589,8 +682,86 @@ namespace SpherePacking.MainWindow
             }
 
             string dir = String.Format("./result/imgSlice/{0}/", DateTime.Now.ToString("yyyyMMddHHmmss"));
-            Directory.CreateDirectory( dir );
+            string info;
+            Directory.CreateDirectory(dir);
+            info = "begin to generate slices...";
+            log.Info(info);
+            tbStatus.Text = info;
+            stopWatch.Restart();
             GenerateSlices(xmin, xmax, ymin, ymax, zmin, zmax, 100, 100, 100, dir + "{0:D4}.bmp");
+
+            info = String.Format("generate slices successfully, the folder is : {0}, and elapsed time is {1}ms", dir, stopWatch.ElapsedMilliseconds);
+            log.Info(info);
+            tbStatus.Text = info;
+            stopWatch.Reset();
+        }
+
+        /// <summary>
+        /// 退出系统
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiExitSystem_Click(object sender, EventArgs e)
+        {
+            if (MessageBox.Show("确定退出?", "quit", MessageBoxButtons.OKCancel) == System.Windows.Forms.DialogResult.OK)
+            {
+                this.Close();
+            }
+        }
+
+        /// <summary>
+        /// 求解DEM问题
+        /// 此处开启线程，防止主界面在求解过程中被卡死
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiSolveProblem_Click(object sender, EventArgs e)
+        {
+            //有时不是Running，而是WaitSleepJoin，需要查一下
+            if ((solveThread != null) && (solveThread.ThreadState == System.Threading.ThreadState.Running || solveThread.ThreadState == System.Threading.ThreadState.WaitSleepJoin))
+            {
+                log.Warn("solving-problem thread is running now!");
+            }
+            else
+            {
+                //在异步线程中启动程序，可以防止解算时界面卡死的情况
+                ThreadStart ts = new ThreadStart(delegate { modelDem3D.SolveProblem(); });
+                solveThread = new Thread(ts);
+                solveThread.IsBackground = true;
+                solveThread.Start();
+                log.Info(String.Format("start to sovle the problem, it contains {0} balls", PackingSystemSetting.BallsNumber));
+            }
+        }
+
+        /// <summary>
+        /// 终止求解DEM问题的线程(如果在运行的话)
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiStopSolveProblem_Click(object sender, EventArgs e)
+        {
+            string text;
+            //有时不是Running，而是WaitSleepJoin，需要查一下
+            if ((solveThread != null) && (solveThread.ThreadState == System.Threading.ThreadState.Running || solveThread.ThreadState == System.Threading.ThreadState.WaitSleepJoin || solveThread.ThreadState == System.Threading.ThreadState.Background))
+            {
+                text = "going to abort the sole thread...";
+                log.Info(text);
+                tbStatus.Text = text;
+                solveThread.Abort();
+                text = "solving-problem thread was aborted successfully...";
+                log.Info(text);
+                tbStatus.Text = text;
+            }
+            else
+            {
+                text = "solving-problem thread is not running now!";
+                log.Warn(text);
+                tbStatus.Text = text;
+            }
+        }
+
+        private void tmiPreference_Click(object sender, EventArgs e)
+        {
 
         }
 
@@ -638,6 +809,150 @@ namespace SpherePacking.MainWindow
 
         }
 
+        
+
+        /// <summary>
+        /// 在更改系统设置之后，根据新的系统设置重新初始化vtk显示相关的小球、容器等
+        /// </summary>
+        private void ReloadSystemSetting()
+        {
+            RenderWindowControl rwc = new RenderWindowControl();
+
+            for (int i = 0; i < this.Controls.Count; i++)
+            {
+                if ((rwc = (this.Controls[i] as RenderWindowControl)) != null)
+                {
+                    RenderWindowControl r = new RenderWindowControl()
+                    {
+                        Location = rwc.Location,
+                        Size = rwc.Size,
+                        AutoSizeMode = rwc.AutoSizeMode,
+                        AutoScaleMode = rwc.AutoScaleMode,
+                        Name = rwc.Name,
+                        AutoScroll = rwc.AutoScroll,
+                        BorderStyle = rwc.BorderStyle,
+                    };
+                    rwc.Dispose();
+                    this.Controls.RemoveByKey("rwcVolumeDisp");
+                    this.Controls.Add(r);
+                    InitializeFormSize();
+                    break;
+                }
+            }
+
+
+            InitializeSystem();
+        }
+
+        /// <summary>
+        /// 回放之前的数据
+        /// 用于演示
+        /// </summary>
+        /// <param name="folder">json文件所在的文件夹</param>
+        private bool PlayBack( string folder )
+        {
+            Console.WriteLine(  IsMainThread );
+            SimpleModelForSave sModel;
+            var files = Directory.GetFiles(folder, "*.json");
+            bool res = true;
+            string text = "";
+
+            log.Info("beginning to play back files...");
+            ShowText("playing back files, better not do other things at the same time...", IsMainThread);
+            foreach (var file in files)
+            {
+                sModel = DataReadWriteHelper.LoadSimpleModelFromFile<SimpleModelForSave>(file);
+                if (sModel != null && sModel.Radii.Rows == balls.Spheres.Count())
+                {
+                    balls.ReloadInfo(sModel);
+                    modelDem3D.UpdateBallInfo(balls);
+                    RefreshRenderWindowCtrl( IsMainThread);
+                }
+                else
+                {
+                    res = false;
+                    text = String.Format("import balls info wrong!! wrong filename is {0}", file);
+                    log.Warn(text);
+                    ShowText(text, IsMainThread);
+                    break;
+                }
+            }
+            if( res )
+            {
+                text = "playing back files successfully...";
+                log.Info(text);
+                ShowText(text, IsMainThread);
+            }
+            return res;
+        }
+
+        /// <summary>
+        /// 设置文本框
+        /// 在主线程中被调用时，直接设置Text即可
+        /// 有的不是在主线程中进行设置的，需要设置Invoke方法
+        /// </summary>
+        /// <param name="text">设置的消息内容</param>
+        /// <param name="isMainThread">是否为主线程</param>
+        private void ShowText( string text, bool isMainThread )
+        {
+            if (tbStatus.IsDisposed)
+                return;
+            try
+            {
+                if (isMainThread)
+                {
+                    tbStatus.Text = text;
+                }
+                else
+                {
+                    this.Invoke((EventHandler)(delegate
+                    {
+                        tbStatus.Text = text;
+                    }));
+                }
+            }
+            // 关闭窗口时控件被释放之后 再去刷新会触发异常
+            catch (Exception ex)
+            {
+                log.Warn(ex.ToString());
+            }
+        }
+
+        /// <summary>
+        /// 刷新RenderWindowControl控件
+        /// 主线程中直接刷新就行，非主线程则需要设置Invoke方法
+        /// </summary>
+        /// <param name="isMainThread"></param>
+        private void RefreshRenderWindowCtrl(bool isMainThread)
+        {
+            if (this.Controls.Find("rwcVolumeDisp", false)[0] as RenderWindowControl == null 
+                || (this.Controls.Find("rwcVolumeDisp", false)[0] as RenderWindowControl).IsDisposed)
+            {
+                return;
+            }
+            try
+            {
+                if (isMainThread)
+                {
+                    (this.Controls.Find("rwcVolumeDisp", false)[0] as RenderWindowControl).Refresh();
+                }
+                else
+                {
+                    this.Invoke((EventHandler)(delegate
+                    {
+                        (this.Controls.Find("rwcVolumeDisp", false)[0] as RenderWindowControl).Refresh();
+                    }));
+                }
+            }
+            // 关闭窗口时控件被释放之后 再去刷新会触发异常
+            catch (Exception ex)
+            {
+                log.Warn(ex.ToString());
+            }
+            
+        }
+
+        
 
     }
 }

@@ -67,19 +67,19 @@ namespace SpherePacking.MainWindow
         /// <param name="model">MddelDem3D</param>
         /// <param name="fn">file name to save</param>
         /// <returns></returns>
-        public static bool SaveModelDemAsSimple( ModelDem3D model, string fn )
+        public static bool SaveObjAsJsonFile( object obj, string fn )
         {
             bool res = true;
 
             try
             {
-                string str = JsonConvert.SerializeObject(new SimpleModelForSave(model));
+                string str = JsonConvert.SerializeObject(obj);
 
                 using (StreamWriter sw = new StreamWriter(fn))
                 {
                     using (JsonWriter js = new JsonTextWriter(sw))
                     {
-                        (new JsonSerializer()).Serialize(js, new SimpleModelForSave(model));
+                        (new JsonSerializer()).Serialize(js, obj);
                     }
                 }
             }
@@ -100,26 +100,22 @@ namespace SpherePacking.MainWindow
         /// <param name="fn"></param>
         /// <param name="sModel"></param>
         /// <returns></returns>
-        public static bool LoadSimpleModelFromFile( string fn, out SimpleModelForSave sModel )
+        public static T LoadSimpleModelFromFile<T>( string fn )
         {
-            bool res = true;
-            
+            T obj;
             try
             {
-                sModel = new SimpleModelForSave(null);
                 StreamReader sr = new StreamReader(fn);
                 string str = sr.ReadToEnd();
-                sModel = JsonConvert.DeserializeObject<SimpleModelForSave>(str);
+                obj = JsonConvert.DeserializeObject<T>(str);
             }
             catch(Exception ex)
             {
-                res = false;
-                sModel = null;
+                obj = default(T);
                 Console.WriteLine( ex );
             }
             
-
-            return res;
+            return obj;
         }
     }
 }
