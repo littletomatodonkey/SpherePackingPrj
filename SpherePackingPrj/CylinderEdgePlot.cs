@@ -32,7 +32,7 @@ namespace SpherePacking.MainWindow
         }
 
 
-        public void PlotCylinderEdge(vtkRenderer renderer,  byte[] bgColor)
+        public void AddCylinderEdgeToActors(byte[] bgColor, ref vtkActorCollection actors)
         {
             int numOfLine = 360;
             vtkPoints points = vtkPoints.New();
@@ -78,7 +78,7 @@ namespace SpherePacking.MainWindow
 
             Marshal.FreeHGlobal(iColor);
 
-            renderer.AddActor(actor);
+            actors.AddItem( actor );
 
 
 
@@ -96,7 +96,7 @@ namespace SpherePacking.MainWindow
             vtkActor actor02 = vtkActor.New();
             actor02.SetMapper(mappper);
 
-            renderer.AddActor(actor02);
+            actors.AddItem(actor);
 
             vtkRegularPolygonSource circle01 = vtkRegularPolygonSource.New();
 
@@ -111,7 +111,7 @@ namespace SpherePacking.MainWindow
             vtkActor actor01 = vtkActor.New();
             actor01.SetMapper(mappper01);
 
-            renderer.AddActor( actor01 );
+            actors.AddItem(actor01);
 
         }
 

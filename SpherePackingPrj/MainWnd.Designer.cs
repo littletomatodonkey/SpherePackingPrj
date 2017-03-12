@@ -59,6 +59,11 @@
             this.rwcVolumeDisp = new Kitware.VTK.RenderWindowControl();
             this.gbStatus = new System.Windows.Forms.GroupBox();
             this.label1 = new System.Windows.Forms.Label();
+            this.tmiComputeParameter = new System.Windows.Forms.ToolStripMenuItem();
+            this.tmiComputePorosity = new System.Windows.Forms.ToolStripMenuItem();
+            this.tmiComputeTwoPointCorr = new System.Windows.Forms.ToolStripMenuItem();
+            this.tmiComputeTortuosity = new System.Windows.Forms.ToolStripMenuItem();
+            this.tmiComputeSurfaceArea = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.gbStatus.SuspendLayout();
             this.SuspendLayout();
@@ -95,6 +100,7 @@
             this.tmiFile,
             this.tmiProject,
             this.小工具ToolStripMenuItem,
+            this.tmiComputeParameter,
             this.tmiHelp});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
@@ -119,42 +125,42 @@
             // 
             this.tmiImportBallsInfo.AccessibleDescription = "";
             this.tmiImportBallsInfo.Name = "tmiImportBallsInfo";
-            this.tmiImportBallsInfo.Size = new System.Drawing.Size(148, 22);
+            this.tmiImportBallsInfo.Size = new System.Drawing.Size(152, 22);
             this.tmiImportBallsInfo.Text = "导入小球信息";
             this.tmiImportBallsInfo.Click += new System.EventHandler(this.tmiImportBallsInfo_Click);
             // 
             // tmiSaveBallsInfo
             // 
             this.tmiSaveBallsInfo.Name = "tmiSaveBallsInfo";
-            this.tmiSaveBallsInfo.Size = new System.Drawing.Size(148, 22);
+            this.tmiSaveBallsInfo.Size = new System.Drawing.Size(152, 22);
             this.tmiSaveBallsInfo.Text = "保存小球信息";
             this.tmiSaveBallsInfo.Click += new System.EventHandler(this.tmiSaveBallsInfo_Click);
             // 
             // tmiSaveCurrentRenderer
             // 
             this.tmiSaveCurrentRenderer.Name = "tmiSaveCurrentRenderer";
-            this.tmiSaveCurrentRenderer.Size = new System.Drawing.Size(148, 22);
+            this.tmiSaveCurrentRenderer.Size = new System.Drawing.Size(152, 22);
             this.tmiSaveCurrentRenderer.Text = "保存当前图像";
             this.tmiSaveCurrentRenderer.Click += new System.EventHandler(this.tmiSaveCurrentRenderer_Click);
             // 
             // tmiGenerateImageSlices
             // 
             this.tmiGenerateImageSlices.Name = "tmiGenerateImageSlices";
-            this.tmiGenerateImageSlices.Size = new System.Drawing.Size(148, 22);
+            this.tmiGenerateImageSlices.Size = new System.Drawing.Size(152, 22);
             this.tmiGenerateImageSlices.Text = "生成切片";
             this.tmiGenerateImageSlices.Click += new System.EventHandler(this.tmiGenerateImageSlices_Click);
             // 
             // tmiSaveSettings
             // 
             this.tmiSaveSettings.Name = "tmiSaveSettings";
-            this.tmiSaveSettings.Size = new System.Drawing.Size(148, 22);
+            this.tmiSaveSettings.Size = new System.Drawing.Size(152, 22);
             this.tmiSaveSettings.Text = "保存配置信息";
             this.tmiSaveSettings.Click += new System.EventHandler(this.tmiSaveSettings_Click);
             // 
             // tmiExitSystem
             // 
             this.tmiExitSystem.Name = "tmiExitSystem";
-            this.tmiExitSystem.Size = new System.Drawing.Size(148, 22);
+            this.tmiExitSystem.Size = new System.Drawing.Size(152, 22);
             this.tmiExitSystem.Text = "退出";
             this.tmiExitSystem.Click += new System.EventHandler(this.tmiExitSystem_Click);
             // 
@@ -290,6 +296,45 @@
             this.label1.TabIndex = 14;
             this.label1.Text = "测试输入框";
             // 
+            // tmiComputeParameter
+            // 
+            this.tmiComputeParameter.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tmiComputePorosity,
+            this.tmiComputeTwoPointCorr,
+            this.tmiComputeSurfaceArea,
+            this.tmiComputeTortuosity});
+            this.tmiComputeParameter.Name = "tmiComputeParameter";
+            this.tmiComputeParameter.Size = new System.Drawing.Size(68, 21);
+            this.tmiComputeParameter.Text = "参数计算";
+            // 
+            // tmiComputePorosity
+            // 
+            this.tmiComputePorosity.Name = "tmiComputePorosity";
+            this.tmiComputePorosity.Size = new System.Drawing.Size(152, 22);
+            this.tmiComputePorosity.Text = "孔隙率";
+            this.tmiComputePorosity.Click += new System.EventHandler(this.tmiComputePorosity_Click);
+            // 
+            // tmiComputeTwoPointCorr
+            // 
+            this.tmiComputeTwoPointCorr.Name = "tmiComputeTwoPointCorr";
+            this.tmiComputeTwoPointCorr.Size = new System.Drawing.Size(152, 22);
+            this.tmiComputeTwoPointCorr.Text = "两点相关函数";
+            this.tmiComputeTwoPointCorr.Click += new System.EventHandler(this.tmiComputeTwoPointCorr_Click);
+            // 
+            // tmiComputeTortuosity
+            // 
+            this.tmiComputeTortuosity.Name = "tmiComputeTortuosity";
+            this.tmiComputeTortuosity.Size = new System.Drawing.Size(152, 22);
+            this.tmiComputeTortuosity.Text = "迂曲度";
+            this.tmiComputeTortuosity.Click += new System.EventHandler(this.tmiComputeTortuosity_Click);
+            // 
+            // tmiComputeSurfaceArea
+            // 
+            this.tmiComputeSurfaceArea.Name = "tmiComputeSurfaceArea";
+            this.tmiComputeSurfaceArea.Size = new System.Drawing.Size(152, 22);
+            this.tmiComputeSurfaceArea.Text = "比表面积";
+            this.tmiComputeSurfaceArea.Click += new System.EventHandler(this.tmiComputeSurfaceArea_Click);
+            // 
             // MainWnd
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
@@ -346,6 +391,11 @@
         private System.Windows.Forms.ToolStripMenuItem tmiStopSolveProblem;
         private System.Windows.Forms.GroupBox gbStatus;
         private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.ToolStripMenuItem tmiComputeParameter;
+        private System.Windows.Forms.ToolStripMenuItem tmiComputePorosity;
+        private System.Windows.Forms.ToolStripMenuItem tmiComputeTwoPointCorr;
+        private System.Windows.Forms.ToolStripMenuItem tmiComputeSurfaceArea;
+        private System.Windows.Forms.ToolStripMenuItem tmiComputeTortuosity;
     }
 }
 

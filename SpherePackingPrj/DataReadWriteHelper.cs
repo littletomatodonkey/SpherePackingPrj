@@ -21,7 +21,7 @@ namespace SpherePacking.MainWindow
         /// <param name="fn">文件名</param>
         /// <param name="info">矩阵</param>
         /// <returns></returns>
-        public static bool RecordInfo(string fn, string dirForSaveInfo, Matrix<double> info)
+        public static bool RecordInfo(string fn, string dirForSaveInfo, Matrix<double> info, bool addComment = true)
         {
             bool res = true;
 
@@ -38,17 +38,20 @@ namespace SpherePacking.MainWindow
                 }
                 FileStream fs = new FileStream(dirForSaveInfo + fn, FileMode.Create);
                 StreamWriter sw = new StreamWriter(fs);
-                string head = String.Format("The Matrix has {0} Rows, {1} Cols", info.Rows, info.Cols);
-                sw.WriteLine(head);
+                if( addComment )
+                {
+                    string head = String.Format("The Matrix has {0} Rows, {1} Cols", info.Rows, info.Cols);
+                    sw.WriteLine(head);
+                }
                 string str = "";
                 for (int i = 0; i < info.Rows; i++)
                 {
                     str = "";
                     for (int j = 0; j < info.Cols - 1; j++)
                     {
-                        str += info[i, 0].ToString("0.0000") + ", ";
+                        str += info[i, j].ToString("0.00000000") + ", ";
                     }
-                    str += info[i, info.Cols - 1].ToString("0.0000");
+                    str += info[i, info.Cols - 1].ToString("0.00000000");
                     sw.WriteLine(str);
                 }
                 sw.Flush();
@@ -81,6 +84,7 @@ namespace SpherePacking.MainWindow
                     {
                         (new JsonSerializer()).Serialize(js, obj);
                     }
+                    sw.Close();
                 }
             }
             catch(Exception ex)
@@ -103,9 +107,9 @@ namespace SpherePacking.MainWindow
         public static T LoadSimpleModelFromFile<T>( string fn )
         {
             T obj;
+            StreamReader sr = new StreamReader(fn);
             try
             {
-                StreamReader sr = new StreamReader(fn);
                 string str = sr.ReadToEnd();
                 obj = JsonConvert.DeserializeObject<T>(str);
             }
@@ -114,6 +118,11 @@ namespace SpherePacking.MainWindow
                 obj = default(T);
                 Console.WriteLine( ex );
             }
+            finally
+            {
+                sr.Close();
+            }
+
             
             return obj;
         }

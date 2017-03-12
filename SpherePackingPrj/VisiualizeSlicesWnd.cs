@@ -44,6 +44,13 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private string fnFormat;
 
+
+        vtkVolume vol;
+        vtkVolumeProperty vpro;
+        vtkColorTransferFunction colorTransferFunction;
+
+
+
         public VisiualizeSlicesWnd(int h, int w, int si, int ei, string format)
         {
             InitializeComponent();
@@ -63,27 +70,86 @@ namespace SpherePacking.MainWindow
         {
             vtkRenderer renderer = rwcShowSlices.RenderWindow.GetRenderers().GetFirstRenderer();
             renderer.SetBackground(1, 1, 1);
-            CuteTools.ShowImageSeries(fnFormat, height, width, startIndex, endIndex, renderer);
+            //CuteTools.ShowImageSeries(fnFormat, height, width, startIndex, endIndex, renderer);
+            //return;
+
+            vtkBMPReader reader = vtkBMPReader.New();
+            reader.SetFilePattern(fnFormat);
+
+            reader.SetDataExtent(0, height - 1, 0, width - 1, startIndex, endIndex);
+
+            reader.SetDataScalarTypeToUnsignedChar();
+            reader.Update();
+
+            vol = vtkVolume.New();
+
+            vtkFixedPointVolumeRayCastMapper texMapper = vtkFixedPointVolumeRayCastMapper.New();
+
+            texMapper.SetInput(reader.GetOutput());
+            vol.SetMapper(texMapper);
+
+            colorTransferFunction = vtkColorTransferFunction.New();
+            colorTransferFunction.AddRGBPoint(0, tbR1.Value * 1.0 / 255, tbG1.Value * 1.0 / 255, tbB1.Value * 1.0 / 255);
+            colorTransferFunction.AddRGBPoint(1, tbR2.Value * 1.0 / 255, tbG2.Value * 1.0 / 255, tbB2.Value * 1.0 / 255);
+            colorTransferFunction.ClampingOn();
+
+            vpro = vtkVolumeProperty.New();
+            vtkPiecewiseFunction compositeOpacity = vtkPiecewiseFunction.New();
+            compositeOpacity.AddPoint(0, 0);
+            //compositeOpacity.AddPoint(120.0, 0.5);
+            compositeOpacity.AddPoint(255.0, 1);
+            compositeOpacity.ClampingOn();
+            vpro.SetScalarOpacity(compositeOpacity);
+            vpro.SetColor(colorTransferFunction);
+            //vpro.SetInterpolationTypeToLinear();
+            vpro.SetInterpolationTypeToNearest();
+            //vpro.ShadeOn();
+            vol.SetProperty(vpro);
+
+
+            //画轴距图
+            vol.SetOrientation(45, 45, 0);
+
+
+            //rwcShowSlices.RenderWindow.GetRenderers().GetFirstRenderer().AddVolume( vol );
+
+            rwcShowSlices.Refresh();
+
+
+        }
+
+        private void btnSaveRenderer_Click(object sender, EventArgs e)
+        {
+            string fn = String.Format("{0}screenshot{1}.png", PackingSystemSetting.ResultDir, DateTime.Now.ToString("yyyyMMhh-HHmmss"));
+            CuteTools.SaveRendererWindowsAsPic(fn, ref rwcShowSlices);
+        }
+
+        private void tbRGB_Scroll(object sender, EventArgs e)
+        {
+            colorTransferFunction = vtkColorTransferFunction.New();
+            colorTransferFunction.AddRGBPoint(0, tbR1.Value * 1.0 / 255, tbG1.Value * 1.0 / 255, tbB1.Value * 1.0 / 255);
+            colorTransferFunction.AddRGBPoint(1, tbR2.Value * 1.0 / 255, tbG2.Value * 1.0 / 255, tbB2.Value * 1.0 / 255);
+            colorTransferFunction.ClampingOn();
+
+            vpro.SetColor(colorTransferFunction);
+
+            //rwcShowSlices.Update();
             rwcShowSlices.Refresh();
         }
 
-        /// <summary>
-        /// 窗口大小改变时，重新改变控件的大小
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void VisiualizeSlicesWnd_SizeChanged(object sender, EventArgs e)
+        private void btnSaveVtkFile_Click(object sender, EventArgs e)
         {
-            int margin = 10;
-            int x = margin;
-            int y = margin;
-            int width = this.Width - 3*margin;
-            int height = this.Height - 6*margin;
-            if( width > 0 && height > 0 )
-            {
-                rwcShowSlices.Bounds = new Rectangle(  x, y, width, height  );
-            }
+            //vtkXMLDataSetWriter writer = new vtkXMLDataSetWriter();
+            //writer.SetFileName("testo.vti");
+
             
+
+
+            
+
         }
+
+
+        
     }
 }

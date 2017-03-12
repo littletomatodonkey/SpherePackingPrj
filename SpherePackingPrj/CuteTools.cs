@@ -100,24 +100,27 @@ namespace SpherePacking.MainWindow
             vol.SetMapper(texMapper);
 
             vtkColorTransferFunction colorTransferFunction = vtkColorTransferFunction.New();
-            colorTransferFunction.AddRGBPoint(0.0, 0.0, 1.0, 0.0);
+            colorTransferFunction.AddRGBPoint(0.0, 0.0, 255.0, 0.0);
             //colorTransferFunction.AddRGBPoint(120.0, 0.0, 0.0, 1.0);
             //colorTransferFunction.AddRGBPoint(160.0, 1.0, 0.0, 0.0);
             //colorTransferFunction.AddRGBPoint(200.0, 0.0, 1.0, 0.0);
-            colorTransferFunction.AddRGBPoint(200.0, 1.0, 0, 1.0);
+            colorTransferFunction.AddRGBPoint(255, 0, 0, 1.0);
             colorTransferFunction.ClampingOn();
 
             vtkVolumeProperty vpro = vtkVolumeProperty.New();
             vtkPiecewiseFunction compositeOpacity = vtkPiecewiseFunction.New();
             compositeOpacity.AddPoint(80, 1);
             compositeOpacity.AddPoint(120, 0.2);
-            compositeOpacity.AddPoint(255, 0.2);
+            compositeOpacity.AddPoint(255, 0);
             compositeOpacity.ClampingOn();
             vpro.SetScalarOpacity(compositeOpacity);
             //vpro.SetColor( colorTransferFunction );
             vpro.SetInterpolationTypeToLinear();
             //vpro.ShadeOn();
-            vol.SetProperty(vpro);   
+            vol.SetProperty(vpro);
+
+            //画轴距图
+            vol.SetOrientation(45, 45, 0);
 
             if( r != null )
             {
@@ -139,6 +142,32 @@ namespace SpherePacking.MainWindow
                 inter.Start();
             }
             
+        }
+
+        public static bool SaveRendererWindowsAsPic(string fn, ref RenderWindowControl rwc )
+        {
+            bool res = true;
+
+            try
+            {
+                vtkWindowToImageFilter screenShot = vtkWindowToImageFilter.New();
+                screenShot.SetInput(rwc.RenderWindow);
+                //screenShot.SetMagnification(3);
+                screenShot.SetInputBufferTypeToRGB();
+                screenShot.ReadFrontBufferOff();
+                screenShot.Update();
+
+                vtkPNGWriter writer = vtkPNGWriter.New();
+                writer.SetFileName(fn);
+                writer.SetInputConnection(screenShot.GetOutputPort());
+                writer.Write();
+            }
+            catch
+            {
+                res = false;
+            }
+
+            return res;
         }
 
 

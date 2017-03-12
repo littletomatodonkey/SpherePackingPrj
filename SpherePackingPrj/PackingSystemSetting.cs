@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace SpherePacking.MainWindow
 {
@@ -59,7 +60,7 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 是否采用并行计算，在for循环的时候或许可以加快运算速度呢
         /// </summary>
-        public static bool IsParaCompute = false;
+        public static bool IsParaCompute = true;
 
         public static BoundType SystemBoundType = BoundType.CubeType;
 
@@ -147,6 +148,11 @@ namespace SpherePacking.MainWindow
             PackingSystemSetting.LogDir = this.LogDir;
             PackingSystemSetting.LibDir = this.LibDir;
             PackingSystemSetting.IsVisualize = this.IsVisualize;
+            if (PackingSystemSetting.Radius < 2)
+            {
+                MessageBox.Show("在此设置半径最小值为2！");
+                PackingSystemSetting.Radius = 2;
+            }
         }
     }
 }

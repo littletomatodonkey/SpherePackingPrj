@@ -16,6 +16,7 @@ using System.IO;
 using System.Collections;
 using Newtonsoft.Json;
 using System.Diagnostics;
+using Microsoft.VisualBasic;
 
 namespace SpherePacking.MainWindow
 {
@@ -104,6 +105,20 @@ namespace SpherePacking.MainWindow
             mainThreadID = Thread.CurrentThread.ManagedThreadId;
             ImportSystemSettings();
 
+            //新开窗口实现可视化
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(100, 100, 0, 99, @"humanThreeDim/final/%03d.bmp");
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(100, 100, 0, 99, @"humanThreeDim/original/%04d.bmp");
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(100, 100, 0, 99, @"humanThreeDim/initial/%03d.bmp");
+
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 0, 62, @"Z10101/final/%03d.bmp");
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 400, 463, @"Z10101/original/Z10101__rec%04d.bmp");
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 0, 62, @"Z10101/initial/%03d.bmp");
+
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 0, 63, @"H1010202/final/%03d.bmp");
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 1000, 1063, @"H1010202/original/H1010202__rec%04d.bmp");
+            //VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 0, 63, @"H1010202/initial/%03d.bmp");
+
+            //vwnd.Show();
         }
 
 
@@ -210,7 +225,6 @@ namespace SpherePacking.MainWindow
         private void timerUpdate_Tick(object sender, EventArgs e)
         {
 
-
         }
 
         /// <summary>
@@ -227,7 +241,8 @@ namespace SpherePacking.MainWindow
                                 renderer.GetActiveCamera().GetFocalPoint()[2]);
 
             vtkLight light2 = vtkLight.New();
-            light2.SetColor(0, 0, 1);
+            //light2.SetColor(0, 0, 1);
+            light2.SetColor(0, 1, 0);
             light2.SetPosition(PackingSystemSetting.CubeLength * 2, PackingSystemSetting.CubeLength * 2, PackingSystemSetting.CubeLength * 2);
             light2.SetFocalPoint(renderer.GetActiveCamera().GetFocalPoint()[0],
                                 renderer.GetActiveCamera().GetFocalPoint()[1],
@@ -269,14 +284,15 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private void RefreshWindow(int iter, Matrix<double> pos)
         {
-            Console.WriteLine("current iteration : " + iter);
+            //Console.WriteLine("current iteration : " + iter);
             for (int i = 0; i < balls.Spheres.Count(); i++)
             {
                 //Console.WriteLine("%dth sphere pos: (" + pos[i, 0] + ", " + +pos[i, 1] + ", " + pos[i, 2] + ")");
                 balls.SetCenter(pos[i, 0], pos[i, 1], pos[i, 2], i);
             }
 
-            if ((iter + 1) % 1 == 0)
+            // 每隔100次迭代 保存一次信息
+            if ((iter + 1) % 100 == 0)
             //if( false )
             {
                 DataReadWriteHelper.SaveObjAsJsonFile(new SimpleModelForSave(modelDem3D), String.Format("{0}/ballsInfo{1}_{2:D4}.json", PackingSystemSetting.ResultDir, PackingSystemSetting.SystemBoundType, iter));
@@ -285,14 +301,17 @@ namespace SpherePacking.MainWindow
             try
             {
                 ShowText("iteration : " + iter, IsMainThread);
-                RefreshRenderWindowCtrl( IsMainThread );
+                if( PackingSystemSetting.IsVisualize )
+                {
+                    RefreshRenderWindowCtrl(IsMainThread);
+                }
                 //SaveRendererAsPic(String.Format("./result/iter{0:D5}.png", iter));
             }
             catch (Exception ex)
             {
                 log.Error(ex);
-                ShowText( String.Format("error : {0}\r\nThread has been aborted at iteration : {1}", ex.ToString(), iter), 
-                    IsMainThread );
+                ShowText( String.Format("error : {0}\r\nThread has been aborted at iteration : {1}", 
+                                    ex.ToString(), iter), IsMainThread );
             }
         }
 
@@ -333,17 +352,7 @@ namespace SpherePacking.MainWindow
             {
                 if ((rwc = (c as RenderWindowControl)) != null)
                 {
-                    vtkWindowToImageFilter screenShot = vtkWindowToImageFilter.New();
-                    screenShot.SetInput(rwc.RenderWindow);
-                    //screenShot.SetMagnification(3);
-                    screenShot.SetInputBufferTypeToRGB();
-                    screenShot.ReadFrontBufferOff();
-                    screenShot.Update();
-
-                    vtkPNGWriter writer = vtkPNGWriter.New();
-                    writer.SetFileName(fn);
-                    writer.SetInputConnection(screenShot.GetOutputPort());
-                    writer.Write();
+                    CuteTools.SaveRendererWindowsAsPic(fn, ref rwc);
                 }
             }
             return res;
@@ -371,12 +380,15 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private void InitStatusForCylinder()
         {
+
             balls = new SpherePlot();
             balls.PlotSphereInRender(renderer, ref actorCollection);
 
             //标准参数应该是100，40
             CylinderEdgePlot plot = new CylinderEdgePlot(PackingSystemSetting.Radius, PackingSystemSetting.Height);
-            plot.PlotCylinderEdge(renderer, new byte[] { 255, 0, 0 });
+            plot.AddCylinderEdgeToActors(new byte[] { 255, 0, 0 }, ref actorCollection);
+
+
         }
 
         #region 窗体Resize相关
@@ -500,6 +512,7 @@ namespace SpherePacking.MainWindow
         {
             //CuteTools.ShowImageSeries(@"./humanThreeDim/H1010202__rec_dpn/final/%03d.bmp", 64, 64, 0, 63);
             Console.WriteLine( IsMainThread );
+            DataReadWriteHelper.RecordInfo("233.txt", @"D:\MyDesktop\", modelDem3D.Radii, false);
         }
 
         private void tmiSettings_Click(object sender, EventArgs e)
@@ -555,8 +568,9 @@ namespace SpherePacking.MainWindow
         /// <param name="e"></param>
         private void tmiVisualzieSlices_Click(object sender, EventArgs e)
         {
-            //在异步线程中启动程序，可以防止解算时界面卡死的情况
-            VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(64, 64, 0, 62, @"initial/%03d.bmp");
+            string str = @"humanThreeDim/final/%03d.bmp";
+            //新开窗口实现可视化
+            VisiualizeSlicesWnd vwnd = new VisiualizeSlicesWnd(100, 100, 0, 99, @"humanThreeDim/final/%03d.bmp");
             vwnd.Show();
         }
 
@@ -656,7 +670,7 @@ namespace SpherePacking.MainWindow
         private void tmiGenerateImageSlices_Click(object sender, EventArgs e)
         {
             ///m是
-            double xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmin = 0, zmax = 0, m = 0.1;
+            double xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmin = 0, zmax = 0, m = 0.0;
             if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
             {
                 xmin = PackingSystemSetting.CubeLength * m;
@@ -666,7 +680,19 @@ namespace SpherePacking.MainWindow
                 ymax = PackingSystemSetting.CubeLength * (1 - m);
 
                 zmin = 0;
-                zmax = PackingSystemSetting.CubeLength / (1 - 2 * m);
+                string strZ = Interaction.InputBox("请输入采样切片的高度范围", "Zmax", "2", 100, 100);
+                try
+                {
+                    zmax = Convert.ToDouble(strZ);// PackingSystemSetting.CubeLength / (1 - 2 * m);  
+                }
+                catch( Exception ex )
+                {
+                    string inf = "input Zmax format error!";
+                    log.Error(inf);
+                    tbStatus.Text = inf;
+                    return;
+                }
+                
             }
             else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
             {
@@ -681,19 +707,16 @@ namespace SpherePacking.MainWindow
                 zmax = PackingSystemSetting.Height / 1.2;
             }
 
-            string dir = String.Format("./result/imgSlice/{0}/", DateTime.Now.ToString("yyyyMMddHHmmss"));
-            string info;
+            string dir = String.Format("{0}imgSlice/{1}/", PackingSystemSetting.ResultDir, DateTime.Now.ToString("yyyyMMddHHmmss"));
             Directory.CreateDirectory(dir);
-            info = "begin to generate slices...";
-            log.Info(info);
-            tbStatus.Text = info;
-            stopWatch.Restart();
-            GenerateSlices(xmin, xmax, ymin, ymax, zmin, zmax, 100, 100, 100, dir + "{0:D4}.bmp");
 
-            info = String.Format("generate slices successfully, the folder is : {0}, and elapsed time is {1}ms", dir, stopWatch.ElapsedMilliseconds);
-            log.Info(info);
-            tbStatus.Text = info;
-            stopWatch.Reset();
+            double reso = 2 * balls.MaxRadius * ActualSampleParameter.PixelResolution / ActualSampleParameter.ActualSampleParaDict[ActualSampleType.FirstBatch30_50].MaxDiameter;
+            
+            ThreadStart ts = new ThreadStart(delegate { GenerateSlices(xmin, xmax, ymin, ymax, zmin, zmax, reso, dir + "{0:D4}.bmp"); });
+            (new Thread(ts)
+                {
+                    IsBackground = true,
+                }).Start();
         }
 
         /// <summary>
@@ -765,48 +788,142 @@ namespace SpherePacking.MainWindow
 
         }
 
+        private void tmiComputePorosity_Click(object sender, EventArgs e)
+        {
+            double porosity = 0.0;
+            string text = "";
+            FolderBrowserDialog dlg = new FolderBrowserDialog();
+            dlg.RootFolder = Environment.SpecialFolder.MyComputer;
+            dlg.ShowDialog();
+            dlg.Description = "请选择英文路径，否则无法读取图像";
+            //ComputeParameters.ComputePorosity(@"D:\MyDesktop\sliceImg\", "{0:D4}.bmp", 10, 21, ref porosity);
+            if( !(dlg.SelectedPath.Length == 0) && ComputeParameters.ComputePorosity(dlg.SelectedPath, ref porosity, true))
+            {
+                text = string.Format("chosen folder is {0}, porosity is {1:0.000000}", dlg.SelectedPath, porosity);
+            }
+            else
+            {
+                text = "folder not chosen...";
+            }
+            ShowText(text, IsMainThread);
+            log.Info( text );
+        }
+
+        private void tmiComputeTwoPointCorr_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void tmiComputeSurfaceArea_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void tmiComputeTortuosity_Click(object sender, EventArgs e)
+        {
+
+        }
+
         #endregion
 
         /// <summary>
         /// 生成图片切片
         /// </summary>
-        /// <param name="xmin"></param>
-        /// <param name="xmax"></param>
-        /// <param name="ymin"></param>
-        /// <param name="ymax"></param>
-        /// <param name="zmin"></param>
-        /// <param name="zmax"></param>
-        /// <param name="sizeX"></param>
-        /// <param name="sizeY"></param>
-        /// <param name="sizeZ"></param>
-        /// <param name="fn"></param>
-        private void GenerateSlices(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax, int sizeX, int sizeY, int sizeZ, string fn)
+        /// <param name="xmin">xmin</param>
+        /// <param name="xmax">xmax</param>
+        /// <param name="ymin">ymin</param>
+        /// <param name="ymax">ymax</param>
+        /// <param name="zmin">zmin</param>
+        /// <param name="zmax">zmax</param>
+        /// <param name="reso">精度</param>
+        /// <param name="fn">文件名</param>
+        private void GenerateSlices(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax, double reso, string fn)
         {
-            double xStep = (xmax - xmin) / (sizeX - 1);
-            double yStep = (ymax - ymin) / (sizeY - 1);
-            double zStep = (zmax - zmin) / (sizeZ - 1);
+            stopWatch.Restart();
 
-            //为保证每个方向上的步长一致，在此采用最小步长
-            double step = Math.Min(Math.Min(xStep, yStep), zStep);
+            string info;
+            info = "begin to generate slices... please do not do any other operations...";
+            log.Info(info);
+            ShowText(info, IsMainThread);
 
-            Parallel.For(0, sizeZ, (i) =>
+            int sizeX = (int)((xmax - xmin) / reso);
+            int sizeY = (int)((ymax - ymin) / reso);
+            int sizeZ = (int)((zmax - zmin) / reso);
+
+
+            // new  method 处理100X100X100图像的时间约为1s
+            List<Matrix<byte>> pics = new List<Matrix<byte>>();
+            for (int i = 0; i < sizeZ; i++)
+            {
+                pics.Add(new Matrix<byte>(sizeX, sizeY));
+            }
+
+            Parallel.For(0, PackingSystemSetting.BallsNumber, (n) =>
                 {
-                    Matrix<byte> m = new Matrix<byte>(sizeX, sizeY);
-                    double z = zmin + step * i;
-                    for (int j = 0; j < sizeX; j++)
+                    int index_x_min = (int)(((modelDem3D.RtPos[n, 0] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
+                    int index_x_max = (int)(((modelDem3D.RtPos[n, 0] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
+                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
+                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
+                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
+                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
+                    index_x_min = index_x_min >= 0 ? index_x_min : 0;
+                    index_x_min = index_x_min <= sizeX ? index_x_min : sizeX;
+                    index_x_max = index_x_max >= 0 ? index_x_max : 0;
+                    index_x_max = index_x_max <= sizeX ? index_x_max : sizeX;
+
+                    index_y_min = index_y_min >= 0 ? index_y_min : 0;
+                    index_y_min = index_y_min <= sizeY ? index_y_min : sizeY;
+                    index_y_max = index_y_max >= 0 ? index_y_max : 0;
+                    index_y_max = index_y_max <= sizeY ? index_y_max : sizeY;
+
+                    index_z_min = index_z_min >= 0 ? index_z_min : 0;
+                    index_z_min = index_z_min <= sizeZ ? index_z_min : sizeZ;
+                    index_z_max = index_z_max >= 0 ? index_z_max : 0;
+                    index_z_max = index_z_max <= sizeZ ? index_z_max : sizeZ;
+
+                    for (int k = index_z_min; k < index_z_max; k++)
                     {
-                        for (int k = 0; k < sizeY; k++)
+                        for (int i = index_x_min; i < index_x_max; i++)
                         {
-                            if (modelDem3D.IsPointInSpheres(xmin + j * step, ymin + k * step, z))
+                            for (int j = index_y_min; j < index_y_max; j++)
                             {
-                                m[j, k] = 255;
+                                if (modelDem3D.IsPointInReferedSphere(xmin + i * reso, ymin + j * reso, zmin + k * reso, n))
+                                {
+                                    pics[k][i, j] |= 255;
+                                }
                             }
                         }
                     }
-                    CvInvoke.Imwrite(String.Format(fn, i), m);
                 });
 
+            for (int i = 0; i < sizeZ; i++)
+            {
+                CvInvoke.Imwrite(String.Format(fn, i), pics[i]);
+            }
 
+
+            // 处理100X100X100图像的时间约为150s
+            //Parallel.For(0, sizeZ, (i) =>
+            //    {
+            //        Matrix<byte> m = new Matrix<byte>(sizeX, sizeY);
+            //        double z = zmin + reso * i;
+            //        for (int j = 0; j < sizeX; j++)
+            //        {
+            //            for (int k = 0; k < sizeY; k++)
+            //            {
+            //                if (modelDem3D.IsPointInSpheres(xmin + j * reso, ymin + k * reso, z))
+            //                {
+            //                    m[j, k] = 255;
+            //                }
+            //            }
+            //        }
+            //        CvInvoke.Imwrite(String.Format(fn, i), m);
+            //    });
+
+            info = String.Format("generate slices successfully, the folder is : {0}, and elapsed time is {1}ms", fn, stopWatch.ElapsedMilliseconds);
+            log.Info(info);
+            ShowText(info, IsMainThread);
+            stopWatch.Reset();
         }
 
         

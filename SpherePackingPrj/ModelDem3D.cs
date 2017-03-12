@@ -30,7 +30,7 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 迭代的采样时间，stepsize
         /// </summary>
-        private const double deltaT = 4e-3; //para before is 4e-3
+        private const double deltaT = 5e-4; //para before is 4e-3
 
         /// <summary>
         /// 重力加速度
@@ -57,7 +57,7 @@ namespace SpherePacking.MainWindow
         /// 圆柱体边界时，值在1e2附近
         /// 
         /// </summary>
-        private double kns = 1e1;  //
+        private double kns = 1e2;  //
 
         /// <summary>
         /// 小球和墙碰撞时产生的力的比例因子
@@ -65,13 +65,52 @@ namespace SpherePacking.MainWindow
         /// 立方体边界时，值在1e2附近
         /// 圆柱体边界时，值在1e2附近
         /// </summary>
-        private const double knw = 1e2;
+        private const double knw = 1e4;
 
         /// <summary>
         /// 小球碰撞后的速度衰减指数
         /// </summary>
-        private const double velDecayRate = 1.0 / 2;
+        private const double velDecayRate = 0.6;
 
+
+        /// <summary>
+        /// 小球在仿真过程中的最大加速度
+        /// 用于限幅
+        /// </summary>
+        private double MaxAcc { get { return 50 * gravity; } }
+
+        /// <summary>
+        /// 小球在仿真过程中的最大速度
+        /// 用于限幅
+        /// </summary>
+        private double MaxVel { get { return 5; } }
+
+
+        #region 局部小球碰撞统计信息的相关变量
+        /// <summary>
+        /// 更新附近小球的迭代周期————每隔这么多代重新计算一次每个小球的附近的小球的下标
+        /// </summary>
+        private int updateLocalBallsIndexIter = 100;
+        
+        /// <summary>
+        /// 小球附近的小球的信息
+        /// 在计算小球是否和其他小球发生碰撞时，只需要计算这些下标对应的小球即可。
+        /// </summary>
+        private List<List<int>> localBallsIndex;
+
+        /// <summary>
+        /// 判定是否在最近的需要进行碰撞计算的小球列表中的阈值
+        /// 如果两个小球的球面的最短距离(d-r1-r2)小于该阈值，则在小球的下标被存储到列表中
+        /// </summary>
+        private double LocalBallsDistThreshold
+        {
+            get
+            {
+                return 2 * MaxVel * updateLocalBallsIndexIter * deltaT;
+            }
+        }
+
+        #endregion
         /// <summary>
         /// 迭代的次数
         /// </summary>
@@ -87,7 +126,6 @@ namespace SpherePacking.MainWindow
         /// 在每次迭代过程中求解出的孔隙率
         /// </summary>
         private Matrix<double> porosity;
-
 
         /// <summary>
         /// 小球的个数
@@ -132,7 +170,12 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 系统的能量(动能+重力势能)
         /// </summary>
-        Matrix<double> energy;
+        private Matrix<double> energy;
+
+        /// <summary>
+        /// 小球三个方向上的速度是否需要衰减
+        /// </summary>
+        private Matrix<byte> shouldVelBeDecayed;
 
         /// <summary>
         /// 用于产生随机数
@@ -143,37 +186,37 @@ namespace SpherePacking.MainWindow
         public int ObjNum
         {
             get { return this.objNum; }
-            private set { this.objNum = value; }
+            //private set { this.objNum = value; }
         }
 
         public Matrix<double> Radii
         {
             get { return this.radii; }
-            private set { this.radii = value; }
+            //private set { this.radii = value; }
         }
 
         public Matrix<double> RtPos
         {
             get { return this.rtPos; }
-            private set { this.rtPos = value; }
+            //private set { this.rtPos = value; }
         }
 
         public Matrix<double> RtVel
         {
             get { return this.rtVel; }
-            private set { this.rtVel = value; }
+            //private set { this.rtVel = value; }
         }
 
         public Matrix<double> RtAcc
         {
             get { return this.rtAcc; }
-            private set { this.rtAcc = value; }
+            //private set { this.rtAcc = value; }
         }
 
         public Matrix<double> Energy
         {
             get { return this.energy; }
-            private set { this.energy = value; }
+            //private set { this.energy = value; }
         }
         #endregion
 
@@ -186,12 +229,12 @@ namespace SpherePacking.MainWindow
 
             if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
             {
-                kns = 1e1;
+                //kns = 1e3;
                 cubeBound = new CubeBound(PackingSystemSetting.CubeLength, PackingSystemSetting.CubeLength, PackingSystemSetting.CubeLength);
             }
             else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
             {
-                kns = 1e2;
+                //kns = 1e3;
                 cylinderBound = new CylinderBound(PackingSystemSetting.Radius, PackingSystemSetting.Height);
             }
             
@@ -219,7 +262,11 @@ namespace SpherePacking.MainWindow
                 rtPos[i, 1] = balls.Spheres[i].GetCenter()[1];
                 rtPos[i, 2] = balls.Spheres[i].GetCenter()[2];
             }
-
+            
+            localBallsIndex = new List<List<int>>();
+            for (int i = 0; i < objNum; i++)
+                localBallsIndex.Add(new List<int>());
+            shouldVelBeDecayed = new Matrix<byte>(objNum, dim);
         }
 
         /// <summary>
@@ -232,15 +279,27 @@ namespace SpherePacking.MainWindow
             
             for(int i=0;i<iteration;i++)
             {
-                ComputePos();
-                ComputeBounds();
+                for (int j = 0; j < objNum; j++)
+                    for (int k = 0; k < dim;k++ )
+                            shouldVelBeDecayed[j, k] = 0;
+
+                ComputeAcc(i);
                 ComputeVel();
-                ComputeAcc();
-                //ApplySaturationAcc();
-                porosity[i, 0] = ComputePorosity(1e0);
+                ComputePos();
+                //ComputeBounds();
+                double maxV = 0, maxA = 0;
+                for (int j = 0; j < objNum; j++)
+                {
+                    if (maxV <= CvInvoke.Norm(rtVel.GetRow(j), Emgu.CV.CvEnum.NormType.L2))
+                        maxV = CvInvoke.Norm(rtVel.GetRow(j), Emgu.CV.CvEnum.NormType.L2);
+                    if (maxA <= CvInvoke.Norm(rtAcc.GetRow(j), Emgu.CV.CvEnum.NormType.L2))
+                        maxA = CvInvoke.Norm(rtAcc.GetRow(j), Emgu.CV.CvEnum.NormType.L2);
+                }
+                
+                //porosity[i, 0] = ComputePorosity(1e0);
                 energy[i, 0] = ComputeEnergy();
-                string s = String.Format("current iteration : {0:D4}, system energy : {1:F4}, elapsed time : {2} ms", 
-                                    i, energy[i,0], sw.ElapsedMilliseconds );
+                string s = String.Format("current iteration : {0:D4}, system energy : {1:F4}, elapsed time : {2} ms, max Vel is: {3}, max Acc is {4} .", 
+                                    i, energy[i,0], sw.ElapsedMilliseconds, maxV, maxA );
                 log.Info( s );
                 //if( i % 20 == 0 )
                 if(true)
@@ -260,6 +319,7 @@ namespace SpherePacking.MainWindow
 
             Console.WriteLine( "Process Time : " + sw.ElapsedMilliseconds + "ms" );
         }
+
 
         /// <summary>
         /// 处理边界上的问题，对小球的位置进行限幅
@@ -296,220 +356,235 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 计算实时加速度
         /// </summary>
-        private void ComputeAcc()
+        private void ComputeAcc(int iter = -1)
         {
             Matrix<double> force = new Matrix<double>(objNum, dim);
-            Matrix<double> m = new Matrix<double>(1, dim);
-            if( false )
+            Matrix<double> m = new Matrix<double>(objNum, dim);
+            
+            //计算加速度时采用并行计算会蜜汁慢速，所以在此直接就用普通的方法了[捂脸]
+            //if( PackingSystemSetting.IsParaCompute )
+            if(false)
             {
-                Parallel.For(0, objNum, (i) => 
+                Parallel.For(0, objNum, (i) =>
                 {
-                    force[i, 2] = -mass[i, 0] * gravity;  //计算重力
-                    //计算小球之间相互的力
-                    for (int j = 0; j < objNum; j++)
-                    {
-                        if (j != i)
-                        {
-                            double dx = ComputeDx(i, j);
-                            if (dx < radii[i, 0] + radii[j, 0])
-                            {
-                                m = kns * (rtPos.GetRow(i) - rtPos.GetRow(j));
-
-                                for (int k = 0; k < dim; k++)
-                                {
-                                    force[i, k] += m[0, k];
-
-                                    rtVel[i, k] = rtVel[i, k] * velDecayRate;
-                                    rtVel[j, k] = rtVel[j, k] * velDecayRate;
-                                }
-                            }
-                        }
-                    }
-
-                    //计算墙壁和小球之间的力
-                    if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
-                    {
-                        if (rtPos[i, 0] - radii[i, 0] < 0)
-                        {
-                            force[i, 0] += knw * (-rtPos[i, 0] + radii[i, 0]);
-                            rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
-                        }
-                        if (rtPos[i, 0] + radii[i, 0] > PackingSystemSetting.CubeLength)
-                        {
-                            force[i, 0] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 0] - radii[i, 0]);
-                            rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
-                        }
-                        if (rtPos[i, 1] - radii[i, 0] < 0)
-                        {
-                            force[i, 1] += knw * (-rtPos[i, 1] + radii[i, 0]);
-                            rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
-                        }
-                        if (rtPos[i, 1] + radii[i, 0] > PackingSystemSetting.CubeLength)
-                        {
-                            force[i, 1] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 1] - radii[i, 0]);
-                            rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
-                        }
-                        if (rtPos[i, 2] - radii[i, 0] < 0)
-                        {
-                            force[i, 2] += knw * (-rtPos[i, 2] + radii[i, 0]);
-                            rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        }
-                        //高度限幅
-                        //if (rtPos[i, 2] + radii[i, 0] > objNum/nBase/nBase)
-                        //{
-                        //    force[i, 2] += knw * (nBase - rtPos[i, 2] - radii[i, 0]);
-                        //    rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        //}
-                    }
-                    else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
-                    {
-                        double dx = CvInvoke.Norm(rtPos.GetRow(i).GetCols(0, 1), Emgu.CV.CvEnum.NormType.L2);
-                        double angle = Math.Atan2(rtPos[i, 1], rtPos[i, 0]);
-                        double rotAngle = angle - Math.PI / 2;
-                        double vx, vy;
-                        if (dx + radii[i, 0] > cylinderBound.Radius)
-                        {
-                            force[i, 0] += Math.Cos(angle) * knw * (-dx - radii[i, 0] + cylinderBound.Radius);
-                            force[i, 1] += Math.Sin(angle) * knw * (-dx - radii[i, 0] + cylinderBound.Radius);
-
-                            //旋转坐标轴
-                            vx = rtVel[i, 0] * Math.Cos(rotAngle) + rtVel[i, 1] * Math.Sin(rotAngle);
-                            vy = -rtVel[i, 0] * Math.Sin(rotAngle) + rtVel[i, 1] * Math.Cos(rotAngle);
-
-                            //圆心法线方向速度衰减
-                            vy = vy * velDecayRate;
-
-                            //将速度坐标轴变换回来
-                            rtVel[i, 0] = vx * Math.Cos(rotAngle) - vy * Math.Sin(rotAngle);
-                            rtVel[i, 1] = vx * Math.Sin(rotAngle) + vy * Math.Cos(rotAngle);
-                        }
-
-                        if (rtPos[i, 2] - radii[i, 0] < 0)
-                        {
-                            force[i, 2] += knw * (-rtPos[i, 2] + radii[i, 0]);
-                            rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        }
-                        //高度限幅
-                        //if (rtPos[i, 2] + radii[i, 0] > cylinderBound.Height)
-                        //{
-                        //    force[i, 2] += knw * (cylinderBound.Height - rtPos[i, 2] - radii[i, 0]);
-                        //    rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        //}
-
-                    }
-
-                    rtAcc[i, 0] = force[i, 0] / mass[i, 0];
-                    rtAcc[i, 1] = force[i, 1] / mass[i, 0];
-                    rtAcc[i, 2] = force[i, 2] / mass[i, 0];
- 
+                    ComputeAccForBall(i,  ref force);
                 });
             }
             else
             {
                 for (int i = 0; i < objNum; i++)
                 {
-                    force[i, 2] = -mass[i, 0] * gravity;  //计算重力
-                    //计算小球之间相互的力
-                    for (int j = 0; j < objNum; j++)
-                    {
-                        if (j != i)
-                        {
-                            double dx = ComputeDx(i, j);
-                            if (dx < radii[i, 0] + radii[j, 0])
-                            {
-                                m = kns * (rtPos.GetRow(i) - rtPos.GetRow(j));
-
-                                for (int k = 0; k < dim; k++)
-                                {
-                                    force[i, k] += m[0, k];
-
-                                    rtVel[i, k] = rtVel[i, k] * velDecayRate;
-                                    rtVel[j, k] = rtVel[j, k] * velDecayRate;
-                                }
-                            }
-                        }
-                    }
-
-                    //计算墙壁和小球之间的力
-                    if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
-                    {
-                        if (rtPos[i, 0] - radii[i, 0] < 0)
-                        {
-                            force[i, 0] += knw * (-rtPos[i, 0] + radii[i, 0]);
-                            rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
-                        }
-                        if (rtPos[i, 0] + radii[i, 0] > PackingSystemSetting.CubeLength)
-                        {
-                            force[i, 0] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 0] - radii[i, 0]);
-                            rtVel[i, 0] = rtVel[i, 0] * velDecayRate;
-                        }
-                        if (rtPos[i, 1] - radii[i, 0] < 0)
-                        {
-                            force[i, 1] += knw * (-rtPos[i, 1] + radii[i, 0]);
-                            rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
-                        }
-                        if (rtPos[i, 1] + radii[i, 0] > PackingSystemSetting.CubeLength)
-                        {
-                            force[i, 1] += knw * (PackingSystemSetting.CubeLength - rtPos[i, 1] - radii[i, 0]);
-                            rtVel[i, 1] = rtVel[i, 1] * velDecayRate;
-                        }
-                        if (rtPos[i, 2] - radii[i, 0] < 0)
-                        {
-                            force[i, 2] += knw * (-rtPos[i, 2] + radii[i, 0]);
-                            rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        }
-                        //高度限幅
-                        //if (rtPos[i, 2] + radii[i, 0] > objNum/nBase/nBase)
-                        //{
-                        //    force[i, 2] += knw * (nBase - rtPos[i, 2] - radii[i, 0]);
-                        //    rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        //}
-                    }
-                    else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
-                    {
-                        double dx = CvInvoke.Norm(rtPos.GetRow(i).GetCols(0, 1), Emgu.CV.CvEnum.NormType.L2);
-                        double angle = Math.Atan2(rtPos[i, 1], rtPos[i, 0]);
-                        double rotAngle = angle - Math.PI / 2;
-                        double vx, vy;
-                        if (dx + radii[i, 0] > cylinderBound.Radius)
-                        {
-                            force[i, 0] += Math.Cos(angle) * knw * (-dx - radii[i, 0] + cylinderBound.Radius);
-                            force[i, 1] += Math.Sin(angle) * knw * (-dx - radii[i, 0] + cylinderBound.Radius);
-
-                            //旋转坐标轴
-                            vx = rtVel[i, 0] * Math.Cos(rotAngle) + rtVel[i, 1] * Math.Sin(rotAngle);
-                            vy = -rtVel[i, 0] * Math.Sin(rotAngle) + rtVel[i, 1] * Math.Cos(rotAngle);
-
-                            //圆心法线方向速度衰减
-                            vy = vy * velDecayRate;
-
-                            //将速度坐标轴变换回来
-                            rtVel[i, 0] = vx * Math.Cos(rotAngle) - vy * Math.Sin(rotAngle);
-                            rtVel[i, 1] = vx * Math.Sin(rotAngle) + vy * Math.Cos(rotAngle);
-                        }
-
-                        if (rtPos[i, 2] - radii[i, 0] < 0)
-                        {
-                            force[i, 2] += knw * (-rtPos[i, 2] + radii[i, 0]);
-                            rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        }
-                        //高度限幅
-                        //if (rtPos[i, 2] + radii[i, 0] > cylinderBound.Height)
-                        //{
-                        //    force[i, 2] += knw * (cylinderBound.Height - rtPos[i, 2] - radii[i, 0]);
-                        //    rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
-                        //}
-
-                    }
-
-                    rtAcc[i, 0] = force[i, 0] / mass[i, 0];
-                    rtAcc[i, 1] = force[i, 1] / mass[i, 0];
-                    rtAcc[i, 2] = force[i, 2] / mass[i, 0];
+                    ComputeAccForBall(i, ref force, iter);
                 }
             }
             
+        }
 
+        
+        /// <summary>
+        /// 计算下标为index的小球的加速度
+        /// iter = -1 采用全部遍历的方法求解距离
+        /// iter >= 0 找到与小球相距小于一定阈值的小球的下标，只对这些小球求解距离
+        /// </summary>
+        /// <param name="index"></param>
+        private void ComputeAccForBall(int index, ref Matrix<double> force, int iter = -1)
+        {
+            Matrix<double> m = new Matrix<double>(1, dim);
+            force[index, 2] = -mass[index, 0] * gravity;  //计算重力
+            
+            //计算小球之间相互的力
+            //计算所有小球距离
+            if( iter == -1 )
+            {
+                //全部求取的情况
+                //for (int j = 0; j < objNum;j++ )
+                //{
+                //    if( j != index )
+                //    {
+                //        double dx = ComputeDx( index, j );
+                //        if( dx < radii[j,0]+radii[index,0] )
+                //        {
+                //            m = kns * (rtPos.GetRow(index) - rtPos.GetRow(j));
+                //            for(int k=0;k<dim;k++)
+                //            {
+                //                force[index, k] += m[0, k];
 
+                //                rtVel[index, k] = rtVel[index, k] * velDecayRate;
+                //                rtVel[j, k] = rtVel[j, k] * velDecayRate;
+                //            }
+                //        }
+                //    }
+                //}
+
+                //对于每个小球，当它与后面的小球相交时，则将后面的小球的受力情况也更新一下
+                //由N*N的时间复杂度变为N*N/2，数量级没变，但是减少了几乎一半的运行时间
+                for (int j = index + 1; j < objNum; j++)
+                {
+                    double dx = ComputeDx(index, j);
+                    if (dx < radii[index, 0] + radii[j, 0])
+                    {
+                        m = kns * (rtPos.GetRow(index) - rtPos.GetRow(j));
+                        for (int k = 0; k < dim; k++)
+                        {
+                            force[index, k] += m[0, k];
+                            force[j, k] -= m[0, k];
+
+                            shouldVelBeDecayed[index, k] = 1;
+                            shouldVelBeDecayed[j, k] = 1;
+                        }
+                        
+                    }
+                }
+            }
+            //存储小球附近的小球信息，不去计算那些在短时间不会碰撞的小球的距离
+            else
+            {
+                
+                if( iter % updateLocalBallsIndexIter == 0 )
+                {
+                    localBallsIndex[index].Clear();
+                    for (int j = index + 1; j < objNum; j++)
+                    {
+                        double dx = ComputeDx(index, j) - radii[j, 0] - radii[index, 0];
+                        if( dx < LocalBallsDistThreshold )
+                        //if( true )
+                        {
+                            localBallsIndex[index].Add( j );
+                        }
+                    }
+                }
+
+                //for (int j = index + 1; j < objNum; j++)
+                //{
+                //    double dx = ComputeDx(index, j);
+                //    if (dx < radii[index, 0] + radii[j, 0])
+                //    {
+                //        if( !localBallsIndex[index].Contains(j) )
+                //        {
+                //            string text = string.Format("distance threshold is {0}, now {1} and {2}'s dist is {3}, but was not considered...", LocalBallsDistThreshold, index, j, dx - (radii[index, 0] + radii[j, 0]));
+                //            log.Info(text);
+                //            Console.WriteLine(text);
+                //        }
+                //        m = kns * (rtPos.GetRow(index) - rtPos.GetRow(j));
+                //        for (int k = 0; k < dim; k++)
+                //        {
+                //            force[index, k] += m[0, k];
+                //            force[j, k] -= m[0, k];
+
+                //            shouldBeComputed[index, k] = 1;
+                //            shouldBeComputed[j, k] = 1;
+                //        }
+
+                //    }
+                //}
+
+                for (int j = 0; j < localBallsIndex[index].Count; j++)
+                {
+                    double dx = ComputeDx(index, localBallsIndex[index][j]);
+                    if (dx < radii[index, 0] + radii[localBallsIndex[index][j], 0])
+                    {
+                        m = kns * (rtPos.GetRow(index) - rtPos.GetRow(localBallsIndex[index][j]));
+
+                        for (int k = 0; k < dim; k++)
+                        {
+                            force[index, k] += m[0, k];
+                            force[localBallsIndex[index][j], k] -= m[0, k];
+
+                            shouldVelBeDecayed[index, k] = 1;
+                            shouldVelBeDecayed[localBallsIndex[index][j], k] = 1;                            
+
+                        }
+                    }
+                }
+
+            }
+
+            //计算墙壁和小球之间的力
+            if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
+            {
+                if (rtPos[index, 0] - radii[index, 0] < 0)
+                {
+                    force[index, 0] += knw * (-rtPos[index, 0] + radii[index, 0]);
+                    shouldVelBeDecayed[index, 0] = 1;
+                }
+                if (rtPos[index, 0] + radii[index, 0] > PackingSystemSetting.CubeLength)
+                {
+                    force[index, 0] += knw * (PackingSystemSetting.CubeLength - rtPos[index, 0] - radii[index, 0]);
+                    shouldVelBeDecayed[index, 0] = 1;
+                }
+                if (rtPos[index, 1] - radii[index, 0] < 0)
+                {
+                    force[index, 1] += knw * (-rtPos[index, 1] + radii[index, 0]);
+                    shouldVelBeDecayed[index, 1] = 1;
+                }
+                if (rtPos[index, 1] + radii[index, 0] > PackingSystemSetting.CubeLength)
+                {
+                    force[index, 1] += knw * (PackingSystemSetting.CubeLength - rtPos[index, 1] - radii[index, 0]);
+                    shouldVelBeDecayed[index, 1] = 1;
+                }
+                if (rtPos[index, 2] - radii[index, 0] < 0)
+                {
+                    force[index, 2] += knw * (-rtPos[index, 2] + radii[index, 0]);
+                    shouldVelBeDecayed[index, 2] = 1;
+                }
+                //高度限幅
+                //if (rtPos[i, 2] + radii[i, 0] > objNum/nBase/nBase)
+                //{
+                //    force[i, 2] += knw * (nBase - rtPos[i, 2] - radii[i, 0]);
+                //    rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
+                //}
+            }
+            else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
+            {
+                double dx = CvInvoke.Norm(rtPos.GetRow(index).GetCols(0, 2), Emgu.CV.CvEnum.NormType.L2);
+                double angle = Math.Atan2(rtPos[index, 1], rtPos[index, 0]);
+                double rotAngle = angle - Math.PI / 2;
+                double vx, vy;
+                if (dx + radii[index, 0] > cylinderBound.Radius)
+                {
+                    force[index, 0] += Math.Cos(angle) * knw * (-dx - radii[index, 0] + cylinderBound.Radius);
+                    force[index, 1] += Math.Sin(angle) * knw * (-dx - radii[index, 0] + cylinderBound.Radius);
+
+                    //简化的方法
+                    shouldVelBeDecayed[index, 0] = 1;
+                    shouldVelBeDecayed[index, 1] = 1;
+
+                    //符合实际情况的方法
+                    ////旋转坐标轴
+                    //vx = rtVel[index, 0] * Math.Cos(rotAngle) + rtVel[index, 1] * Math.Sin(rotAngle);
+                    //vy = -rtVel[index, 0] * Math.Sin(rotAngle) + rtVel[index, 1] * Math.Cos(rotAngle);
+
+                    ////圆心法线方向速度衰减
+                    ////vy = vy * velDecayRate;
+                    //vy = vy * velDecayRate;
+
+                    ////将速度坐标轴变换回来
+                    //rtVel[index, 0] = vx * Math.Cos(rotAngle) - vy * Math.Sin(rotAngle);
+                    //rtVel[index, 1] = vx * Math.Sin(rotAngle) + vy * Math.Cos(rotAngle);
+                }
+
+                if (rtPos[index, 2] - radii[index, 0] < 0)
+                {
+                    force[index, 2] += knw * (-rtPos[index, 2] + radii[index, 0]);
+                    shouldVelBeDecayed[index, 2] = 1;
+                    //rtVel[index, 2] = rtVel[index, 2] * velDecayRate;
+                }
+                //高度限幅
+                //if (rtPos[i, 2] + radii[i, 0] > cylinderBound.Height)
+                //{
+                //    force[i, 2] += knw * (cylinderBound.Height - rtPos[i, 2] - radii[i, 0]);
+                //    rtVel[i, 2] = rtVel[i, 2] * velDecayRate;
+                //}
+
+            }
+
+            ///加速度的计算
+            for (int k = 0; k < 3;k++ )
+            {
+                rtAcc[index, k] = force[index, k] / mass[index, 0];
+            }
+            ApplySaturationAcc();
+                
         }
 
         /// <summary>
@@ -517,6 +592,16 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private void ComputeVel()
         {
+            //CvInvoke.AccumulateProduct(,);
+            Parallel.For(0, objNum, (i) =>
+                {
+                    for(int j=0;j<3;j++)
+                    {
+                        if (shouldVelBeDecayed[i, j] == 1)
+                            rtVel[i, j] *= velDecayRate;
+                    }
+                });
+
             if (PackingSystemSetting.IsParaCompute)
             {
                 Parallel.For(0, objNum, (i) =>
@@ -535,7 +620,8 @@ namespace SpherePacking.MainWindow
                     rtVel[i, 2] += rtAcc[i, 2] * deltaT;
                 }
             }
-            
+
+            ApplySaturationVel();
         }
 
         /// <summary>
@@ -653,20 +739,23 @@ namespace SpherePacking.MainWindow
         }
 
         /// <summary>
-        /// 对加速度限幅
+        /// 判断点(x,y,z)是否在下标为n的小球体内
         /// </summary>
-        private void ApplySaturationAcc()
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="z"></param>
+        /// <param name="i"></param>
+        /// <returns></returns>
+        public bool IsPointInReferedSphere(double x, double y, double z, int i)
         {
-            double maxG = 3 * gravity;
-            for(int i=0;i<rtAcc.Rows;i++)
+            bool res = false;
+            if ((i < objNum || i >= 0) &&((x - rtPos[i, 0]) * (x - rtPos[i, 0]) + (y - rtPos[i, 1]) * (y - rtPos[i, 1]) + (z - rtPos[i, 2]) * (z - rtPos[i, 2])) < radii[i, 0] * radii[i, 0])
             {
-                for(int j=0;j<rtAcc.Cols;j++)
-                {
-                    rtAcc[i, j] = rtAcc[i, j] < maxG ? rtAcc[i, j] : maxG;
-                    rtAcc[i, j] = rtAcc[i, j] > -maxG ? rtAcc[i, j] : -maxG;
-                }
+                res = true;
             }
+            return res;
         }
+
 
         /// <summary>
         /// 更新小球的位置和半径信息
@@ -692,13 +781,88 @@ namespace SpherePacking.MainWindow
         private double ComputeEnergy()
         {
             double energy = 0.0;
-
             for (int i = 0; i < mass.Rows;i++ )
             {
                 energy += 0.5 * mass[i, 0] * rtVel.GetRow(i).Norm + mass[i, 0] * gravity * (RtPos[i, 2]-radii[i,0]);
             }
-
             return energy;
+        }
+
+        /// <summary>
+        /// 对数组进行限幅
+        /// 每一行作为一个向量，对其幅值进行限幅
+        /// </summary>
+        /// <param name="data">矩阵</param>
+        /// <param name="max">最大值</param>
+        private void ApplySaturation( ref Matrix<double> data, double max  )
+        {
+            Matrix<double> square = new Matrix<double>(data.Rows, 3); //平方
+            Matrix<double> norm = new Matrix<double>(data.Rows, 1);  //平方和
+            Matrix<double> res = new Matrix<double>( data.Rows, 1 );  //平方和的开方
+            CvInvoke.AccumulateSquare( data, square );  
+            
+            CvInvoke.Add(square.GetCol(0), square.GetCol(1), norm);
+            CvInvoke.Add(square.GetCol(2), norm, norm);
+            CvInvoke.Sqrt( norm, res );
+
+            for (int i = 0; i < data.Rows;i++ )
+            {
+                if (res[i, 0] > max)
+                {
+                    for (int j = 0; j < data.Cols; j++)
+                        data[i, j] = data[i, j] * max / res[i, 0];
+                }
+            }
+        }
+
+        /// <summary>
+        /// 对速度限幅
+        /// 奈何ref参数不能放在lambda表达式中。。
+        /// </summary>
+        private void ApplySaturationVel()
+        {
+            Matrix<double> square = new Matrix<double>(rtVel.Rows, 3); //平方
+            Matrix<double> norm = new Matrix<double>(rtVel.Rows, 1);  //平方和
+            Matrix<double> res = new Matrix<double>(rtVel.Rows, 1);  //平方和的开方
+            CvInvoke.AccumulateSquare(rtVel, square);
+
+            CvInvoke.Add(square.GetCol(0), square.GetCol(1), norm);
+            CvInvoke.Add(square.GetCol(2), norm, norm);
+            CvInvoke.Sqrt(norm, res);
+
+            Parallel.For(0, rtVel.Rows, (i) =>
+            {
+                if (res[i, 0] > MaxVel)
+                {
+                    for (int j = 0; j < rtVel.Cols; j++)
+                        rtVel[i, j] = rtVel[i, j] * MaxVel / res[i, 0];
+                }
+            });
+        }
+
+        /// <summary>
+        /// 对加速度限幅
+        /// 奈何ref参数不能放在lambda表达式中。。
+        /// </summary>
+        private void ApplySaturationAcc()
+        {
+            Matrix<double> square = new Matrix<double>(rtAcc.Rows, 3); //平方
+            Matrix<double> norm = new Matrix<double>(rtAcc.Rows, 1);  //平方和
+            Matrix<double> res = new Matrix<double>(rtAcc.Rows, 1);  //平方和的开方
+            CvInvoke.AccumulateSquare(rtAcc, square);
+
+            CvInvoke.Add(square.GetCol(0), square.GetCol(1), norm);
+            CvInvoke.Add(square.GetCol(2), norm, norm);
+            CvInvoke.Sqrt(norm, res);
+
+            Parallel.For(0, rtAcc.Rows, (i) =>
+            {
+                if (res[i, 0] > MaxAcc)
+                {
+                    for (int j = 0; j < rtAcc.Cols; j++)
+                        rtAcc[i, j] = rtAcc[i, j] * MaxAcc / res[i, 0];
+                }
+            });
         }
         
     }
