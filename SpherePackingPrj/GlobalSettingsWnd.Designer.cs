@@ -36,6 +36,8 @@
             this.label1 = new System.Windows.Forms.Label();
             this.tbResultsDir = new System.Windows.Forms.TextBox();
             this.gbModelInfo = new System.Windows.Forms.GroupBox();
+            this.tbZRate = new System.Windows.Forms.TextBox();
+            this.label9 = new System.Windows.Forms.Label();
             this.tbBallsNumber = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
             this.tbIterNumber = new System.Windows.Forms.TextBox();
@@ -52,8 +54,8 @@
             this.cbBoundType = new System.Windows.Forms.ComboBox();
             this.btnSaveInfo = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
-            this.tbZRate = new System.Windows.Forms.TextBox();
-            this.label9 = new System.Windows.Forms.Label();
+            this.label10 = new System.Windows.Forms.Label();
+            this.cbParticleSizeType = new System.Windows.Forms.ComboBox();
             this.gbDirSettings.SuspendLayout();
             this.gbModelInfo.SuspendLayout();
             this.SuspendLayout();
@@ -66,7 +68,7 @@
             this.gbDirSettings.Controls.Add(this.label2);
             this.gbDirSettings.Controls.Add(this.label1);
             this.gbDirSettings.Controls.Add(this.tbResultsDir);
-            this.gbDirSettings.Location = new System.Drawing.Point(12, 155);
+            this.gbDirSettings.Location = new System.Drawing.Point(12, 177);
             this.gbDirSettings.Name = "gbDirSettings";
             this.gbDirSettings.Size = new System.Drawing.Size(513, 106);
             this.gbDirSettings.TabIndex = 0;
@@ -133,6 +135,8 @@
             // 
             // gbModelInfo
             // 
+            this.gbModelInfo.Controls.Add(this.cbParticleSizeType);
+            this.gbModelInfo.Controls.Add(this.label10);
             this.gbModelInfo.Controls.Add(this.tbZRate);
             this.gbModelInfo.Controls.Add(this.label9);
             this.gbModelInfo.Controls.Add(this.tbBallsNumber);
@@ -151,10 +155,27 @@
             this.gbModelInfo.Controls.Add(this.cbBoundType);
             this.gbModelInfo.Location = new System.Drawing.Point(12, 25);
             this.gbModelInfo.Name = "gbModelInfo";
-            this.gbModelInfo.Size = new System.Drawing.Size(513, 115);
+            this.gbModelInfo.Size = new System.Drawing.Size(513, 130);
             this.gbModelInfo.TabIndex = 1;
             this.gbModelInfo.TabStop = false;
             this.gbModelInfo.Text = "模型信息设置";
+            // 
+            // tbZRate
+            // 
+            this.tbZRate.Location = new System.Drawing.Point(406, 19);
+            this.tbZRate.Name = "tbZRate";
+            this.tbZRate.Size = new System.Drawing.Size(72, 21);
+            this.tbZRate.TabIndex = 24;
+            // 
+            // label9
+            // 
+            this.label9.AutoSize = true;
+            this.label9.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label9.Location = new System.Drawing.Point(328, 22);
+            this.label9.Name = "label9";
+            this.label9.Size = new System.Drawing.Size(70, 14);
+            this.label9.TabIndex = 23;
+            this.label9.Text = "Z方向比例";
             // 
             // tbBallsNumber
             // 
@@ -286,7 +307,7 @@
             // 
             // btnSaveInfo
             // 
-            this.btnSaveInfo.Location = new System.Drawing.Point(136, 267);
+            this.btnSaveInfo.Location = new System.Drawing.Point(136, 289);
             this.btnSaveInfo.Name = "btnSaveInfo";
             this.btnSaveInfo.Size = new System.Drawing.Size(75, 23);
             this.btnSaveInfo.TabIndex = 2;
@@ -296,35 +317,41 @@
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(257, 267);
+            this.btnCancel.Location = new System.Drawing.Point(257, 289);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(75, 23);
             this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "取消";
             this.btnCancel.UseVisualStyleBackColor = true;
             // 
-            // tbZRate
+            // label10
             // 
-            this.tbZRate.Location = new System.Drawing.Point(406, 19);
-            this.tbZRate.Name = "tbZRate";
-            this.tbZRate.Size = new System.Drawing.Size(72, 21);
-            this.tbZRate.TabIndex = 24;
+            this.label10.AutoSize = true;
+            this.label10.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label10.Location = new System.Drawing.Point(20, 102);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(91, 14);
+            this.label10.TabIndex = 25;
+            this.label10.Text = "小球粒径类型";
             // 
-            // label9
+            // cbParticleSizeType
             // 
-            this.label9.AutoSize = true;
-            this.label9.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label9.Location = new System.Drawing.Point(328, 22);
-            this.label9.Name = "label9";
-            this.label9.Size = new System.Drawing.Size(70, 14);
-            this.label9.TabIndex = 23;
-            this.label9.Text = "Z方向比例";
+            this.cbParticleSizeType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cbParticleSizeType.FormattingEnabled = true;
+            this.cbParticleSizeType.Items.AddRange(new object[] {
+            "30~50um",
+            "50~70um",
+            "70~100um"});
+            this.cbParticleSizeType.Location = new System.Drawing.Point(118, 102);
+            this.cbParticleSizeType.Name = "cbParticleSizeType";
+            this.cbParticleSizeType.Size = new System.Drawing.Size(121, 20);
+            this.cbParticleSizeType.TabIndex = 26;
             // 
             // GlobalSettingsWnd
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(537, 309);
+            this.ClientSize = new System.Drawing.Size(578, 377);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnSaveInfo);
             this.Controls.Add(this.gbModelInfo);
@@ -367,5 +394,7 @@
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.TextBox tbZRate;
         private System.Windows.Forms.Label label9;
+        private System.Windows.Forms.ComboBox cbParticleSizeType;
+        private System.Windows.Forms.Label label10;
     }
 }

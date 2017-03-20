@@ -512,9 +512,40 @@ namespace SpherePacking.MainWindow
         {
             //CuteTools.ShowImageSeries(@"./humanThreeDim/H1010202__rec_dpn/final/%03d.bmp", 64, 64, 0, 63);
             Console.WriteLine( IsMainThread );
-            DataReadWriteHelper.RecordInfo("233.txt", @"D:\MyDesktop\", modelDem3D.Radii, false);
+            GenerateRandomNumber.TestLogNormalNumber();
+            
         }
 
+        /// <summary>
+        /// 对新的两两小球之间的距离计算的时间进行评价
+        /// </summary>
+        private void TestComputeDistEffect()
+        {
+            int num = 500;
+            Matrix<double> mean = new Matrix<double>(1, 1);
+            Matrix<double> stddev = new Matrix<double>(1, 1);
+            mean[0, 0] = 0;
+            stddev[0, 0] = 1;
+            Matrix<double> pos = new Matrix<double>(num, 2);
+            CvInvoke.Randn(pos, mean, stddev);
+
+            stopWatch.Restart();
+            Matrix<double> dists = CuteTools.ComputeMatDist(pos);
+            
+            Console.WriteLine(stopWatch.ElapsedMilliseconds);
+
+            stopWatch.Restart();
+            for (int i = 0; i < num;i++ )
+            {
+                for(int j=i+1;j<num;j++)
+                {
+                    dists[i, j] = CvInvoke.Norm( pos.GetRow(i) - pos.GetRow(j), Emgu.CV.CvEnum.NormType.L2 );
+                    dists[j, i] = dists[i, j];
+                }
+            }
+            Console.WriteLine(stopWatch.ElapsedMilliseconds);
+        }
+        
         private void tmiSettings_Click(object sender, EventArgs e)
         {
             GlobalSettingsWnd settingsWnd = new GlobalSettingsWnd();
@@ -704,14 +735,29 @@ namespace SpherePacking.MainWindow
                 ymax = PackingSystemSetting.Radius * m;
 
                 zmin = 0;
-                zmax = PackingSystemSetting.Height / 1.2;
+                string strZ = Interaction.InputBox("请输入采样切片的高度范围", "Zmax", "2", 100, 100);
+                try
+                {
+                    zmax = Convert.ToDouble(strZ);// PackingSystemSetting.CubeLength / (1 - 2 * m);  
+                }
+                catch (Exception ex)
+                {
+                    string inf = "input Zmax format error!";
+                    log.Error(inf);
+                    tbStatus.Text = inf;
+                    return;
+                }
             }
 
             string dir = String.Format("{0}imgSlice/{1}/", PackingSystemSetting.ResultDir, DateTime.Now.ToString("yyyyMMddHHmmss"));
             Directory.CreateDirectory(dir);
 
-            double reso = 2 * balls.MaxRadius * ActualSampleParameter.PixelResolution / ActualSampleParameter.ActualSampleParaDict[ActualSampleType.FirstBatch30_50].MaxDiameter;
-            
+            double reso = 2 * balls.MaxRadius * ActualSampleParameter.PixelResolution / ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter;
+            string info = string.Format("the reso of the system is {0}, which all the radii are divided can get the images in pixels", reso);
+            Console.WriteLine();
+            log.Info(info);
+            Console.WriteLine(info);
+
             ThreadStart ts = new ThreadStart(delegate { GenerateSlices(xmin, xmax, ymin, ymax, zmin, zmax, reso, dir + "{0:D4}.bmp"); });
             (new Thread(ts)
                 {
@@ -862,10 +908,10 @@ namespace SpherePacking.MainWindow
                 {
                     int index_x_min = (int)(((modelDem3D.RtPos[n, 0] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
                     int index_x_max = (int)(((modelDem3D.RtPos[n, 0] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
-                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
-                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
-                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
-                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
+                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - ymin)) / reso) - 1;
+                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - ymin)) / reso) + 1;
+                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - zmin)) / reso) - 1;
+                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - zmin)) / reso) + 1;
                     index_x_min = index_x_min >= 0 ? index_x_min : 0;
                     index_x_min = index_x_min <= sizeX ? index_x_min : sizeX;
                     index_x_max = index_x_max >= 0 ? index_x_max : 0;

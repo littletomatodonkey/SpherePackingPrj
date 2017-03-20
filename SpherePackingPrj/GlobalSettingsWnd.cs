@@ -46,7 +46,7 @@ namespace SpherePacking.MainWindow
             tbLogDir.Text = PackingSystemSetting.LogDir;
 
             tbBallsNumber.Text = PackingSystemSetting.BallsNumber.ToString();
-
+            cbParticleSizeType.SelectedIndex = (int)PackingSystemSetting.ParticleSizeType;
             return res;
         }
 
@@ -72,6 +72,7 @@ namespace SpherePacking.MainWindow
                 PackingSystemSetting.IsVisualize = cbVisualize.Checked;
                 PackingSystemSetting.ResultDir = tbResultsDir.Text;
                 PackingSystemSetting.LogDir = tbLogDir.Text;
+                PackingSystemSetting.ParticleSizeType = (ActualSampleType)cbParticleSizeType.SelectedIndex;
                 switch (PackingSystemSetting.SystemBoundType)
                 {
                     case BoundType.CubeType:

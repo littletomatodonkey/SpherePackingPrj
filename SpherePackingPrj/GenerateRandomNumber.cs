@@ -18,6 +18,27 @@ namespace SpherePacking.MainWindow
         }
 
         /// <summary>
+        /// 返回一个符合(miu, sigma)的正态分布的随机数
+        /// </summary>
+        /// <param name="miu"></param>
+        /// <param name="sigma"></param>
+        /// <returns></returns>
+        public static double NormalDistribution(double miu, double sigma)
+        {
+            double u1, u2, v1 = 0, v2 = 0, s = 0, z1 = 0;
+            while (s > 1 || s == 0)
+            {
+                u1 = rnd.NextDouble();
+                u2 = rnd.NextDouble();
+                v1 = 2 * u1 - 1;
+                v2 = 2 * u2 - 1;
+                s = v1 * v1 + v2 * v2;
+            }
+            z1 = Math.Sqrt(-2 * Math.Log(s) / s) * v1;
+            return z1*sigma+miu; //返回两个服从正态分布N(0,1)的随机数z0 和 z1
+        }
+
+        /// <summary>
         /// 产生随机正态正态分布的数
         /// log(N)符合正态分布
         /// 产生的随机数在
@@ -29,18 +50,13 @@ namespace SpherePacking.MainWindow
         /// <returns></returns>
         public static double RandomLogNormal(double miu, double sigma, double min, double max)//产生对数正态分布随机数
         {
-            Matrix<double> m = new Matrix<double>(1, 1);
-            MCvScalar mm = new MCvScalar(miu);
-            MCvScalar ms = new MCvScalar(sigma);
-
+            double m = 0.0;
             do
             {
-                CvInvoke.Randn(m, mm, ms);
-                //log(N)符合正态分布，因此需要对其取指数
-                CvInvoke.Exp(m, m);
-            } while (m[0, 0] < min || m[0, 0] > max);
-
-            return m[0, 0];
+                m = NormalDistribution(miu, sigma);
+                m = Math.Exp(m);
+            }while( m < min || m > max );
+            return m;
         }
 
         /// <summary>
@@ -48,11 +64,11 @@ namespace SpherePacking.MainWindow
         /// </summary>
         public static void TestLogNormalNumber()
         {
-            int num = 10000;
-            double min = 13.183e-6;
-            double max = 91.201e-6;
-            double mu = 3.534-6*Math.Log(10, Math.E);
-            double sigma = 0.285571;
+            int num = 50000;
+            double min = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MinDiameter;
+            double max = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter;
+            double mu = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].LogMiu;
+            double sigma = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].LogSigma;
             Matrix<double> m = new Matrix<double>(num, 1);
             for (int i = 0; i < num; i++)
             {

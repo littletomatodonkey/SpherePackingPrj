@@ -36,8 +36,20 @@ namespace SpherePacking.MainWindow
                             Diameter10 = 36.99E-6,
                             Diameter50 = 52.623E-6,
                             Diameter90 = 74.69E-6,
-                            LogMiu = 3.96123- 6 * Math.Log(10),
+                            LogMiu = 3.96123 - 6 * Math.Log(10),
                             LogSigma = 0.279829,
+                        }},
+
+                //70~100 um参数
+                {ActualSampleType.FirstBatch70_100, new ActualSampleInfo()
+                        {
+                            MaxDiameter = 181.97e-6,
+                            MinDiameter = 30.2e-6,
+                            Diameter10 = 56.988e-6,
+                            Diameter50 = 80.149E-6,
+                            Diameter90 = 112.321E-6,
+                            LogMiu = 4.38258 - 6 * Math.Log(10),
+                            LogSigma = 0.2700685,
                         }},
 
             };

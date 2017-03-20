@@ -90,6 +90,11 @@ namespace SpherePacking.MainWindow
         /// 是否进行可视化
         /// </summary>
         public static bool IsVisualize = true;
+
+        /// <summary>
+        /// 小球粒径类型
+        /// </summary>
+        public static ActualSampleType ParticleSizeType = ActualSampleType.FirstBatch30_50;
     }
 
     class PackSysSettingForSave
@@ -148,11 +153,11 @@ namespace SpherePacking.MainWindow
             PackingSystemSetting.LogDir = this.LogDir;
             PackingSystemSetting.LibDir = this.LibDir;
             PackingSystemSetting.IsVisualize = this.IsVisualize;
-            if (PackingSystemSetting.Radius < 2)
-            {
-                MessageBox.Show("在此设置半径最小值为2！");
-                PackingSystemSetting.Radius = 2;
-            }
+            //if (PackingSystemSetting.Radius < 2)
+            //{
+            //    MessageBox.Show("在此设置半径最小值为2！");
+            //    PackingSystemSetting.Radius = 2;
+            //}
         }
     }
 }

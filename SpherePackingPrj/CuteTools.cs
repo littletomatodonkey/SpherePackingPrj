@@ -144,6 +144,12 @@ namespace SpherePacking.MainWindow
             
         }
 
+        /// <summary>
+        /// 对指定的RenderWindowControl进行截屏并保存
+        /// </summary>
+        /// <param name="fn"></param>
+        /// <param name="rwc"></param>
+        /// <returns></returns>
         public static bool SaveRendererWindowsAsPic(string fn, ref RenderWindowControl rwc )
         {
             bool res = true;
@@ -168,6 +174,33 @@ namespace SpherePacking.MainWindow
             }
 
             return res;
+        }
+
+
+        /// <summary>
+        /// 计算小球之间的两两距离，输入为N X dim的位置信息矩阵，返回N X N的距离矩阵
+        ///     注：该方法对于4000个二维小球仅需800ms，如果采用for循环的话，需要100s左右
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <returns></returns>
+        public static Matrix<double> ComputeMatDist( Matrix<double> pos )
+        {
+            int num = pos.Rows;
+            Matrix<double> dists = new Matrix<double>(num, num);
+            Matrix<double> xsquare = new Matrix<double>(num, pos.Cols);
+            Matrix<double> xsquareSum = new Matrix<double>(num, 1);
+            
+            CvInvoke.Multiply(pos, pos, xsquare);
+
+            for (int i = 0; i < pos.Cols;i++ )
+            {
+                CvInvoke.Add(xsquare.GetCol(i), xsquareSum, xsquareSum);
+            }
+            CvInvoke.Repeat(xsquareSum, 1, num, dists);
+            dists = dists + dists.Transpose();
+            dists -= 2 * pos.Mul(pos.Transpose());
+            CvInvoke.Sqrt(dists, dists);
+            return dists;
         }
 
 

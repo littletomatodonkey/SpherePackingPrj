@@ -23,7 +23,7 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 最大的半径
         /// </summary>
-        public double MaxRadius { get { return 0.5 - MaxCenterBias/2; } }
+        public double MaxRadius { get { return 0.5 - MaxCenterBias / 2; } }
         
         /// <summary>
         /// 小球的半径的最大偏差（相对于0.5）
@@ -64,6 +64,7 @@ namespace SpherePacking.MainWindow
                     InitializeSpheres(PackingSystemSetting.CubeLength / 2, PackingSystemSetting.CubeLength/2);
                     break;
                 case BoundType.CylinderType:
+                    // need to be midified later...
                     double len =  (PackingSystemSetting.Radius / Math.Sqrt(2) - 0.3);
                     InitializeSpheres( len, 0 );
                     break;
@@ -100,7 +101,7 @@ namespace SpherePacking.MainWindow
                         spheres[index].SetRadius(ComputeRandomRadius(RandomType.RandomLogNormalType));
                         spheres[index].SetCenter(i + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + step/2, 
                                                  j + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + step/2, 
-                                                 h + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + step/2);
+                                                 h + step/2);
                         
                         spheres[index].SetPhiResolution(20);
                         spheres[index++].SetThetaResolution(20);
@@ -123,7 +124,6 @@ namespace SpherePacking.MainWindow
         /// 计算小球的半径
         /// 小球的半径的最大值 Rmax = 0.5 - MaxCenterBias/2, 确保在一个单位1的立方体内不会重叠
         /// 此处设置的是均匀随机分布，小球半径符合还可能符合对数正态分布等
-        /// ----> to be improved
         /// </summary>
         /// <returns></returns>
         private double ComputeRandomRadius(RandomType type)
@@ -137,13 +137,13 @@ namespace SpherePacking.MainWindow
                     break;
                 case RandomType.RandomLogNormalType:
                     //第一批样品30~50um的的参数
-                    double maxD = ActualSampleParameter.ActualSampleParaDict[ ActualSampleType.FirstBatch30_50].MaxDiameter;
-                    double minD = ActualSampleParameter.ActualSampleParaDict[ActualSampleType.FirstBatch30_50].MinDiameter;
-                    double sigma = ActualSampleParameter.ActualSampleParaDict[ActualSampleType.FirstBatch30_50].LogSigma;
-                    double miu = ActualSampleParameter.ActualSampleParaDict[ActualSampleType.FirstBatch30_50].LogMiu;
+                    double maxD = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter;
+                    double minD = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MinDiameter;
+                    double sigma = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].LogSigma;
+                    double miu = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].LogMiu;
                     MaxRadiusBias = (1 - minD / maxD) / 2;
 
-                    double reso = (0.5 - MaxCenterBias / 2) / (maxD / 2);
+                    double reso = MaxRadius / (maxD / 2);
                     radius = GenerateRandomNumber.RandomLogNormal(miu, 
                                                                   sigma, 
                                                                   minD,
