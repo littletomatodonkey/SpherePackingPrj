@@ -17,7 +17,6 @@ namespace SpherePacking.MainWindow
     /// </summary>
     class ModelDem3D
     {
-
         public delegate void RefreshWindowHandler(int iter, Matrix<double> m);
 
         public RefreshWindowHandler RefreshHandler;
@@ -29,8 +28,12 @@ namespace SpherePacking.MainWindow
 
         /// <summary>
         /// 迭代的采样时间，stepsize
+        /// 最小之前设置为1e-4
         /// </summary>
-        private const double deltaT = 5e-4; //para before is 4e-3
+        private double DeltaT
+        {
+            get { return PackingSystemSetting.StepLength; }
+        }
 
         /// <summary>
         /// 重力加速度
@@ -42,7 +45,7 @@ namespace SpherePacking.MainWindow
         /// 当其中一个小球移动后使得小球的相交距离大于这个值的时候，将两者的相交距离限制在该阈值
         /// 如果大于阈值，需要重新计算移动的向量
         /// </summary>
-        private const double maxOverlapWithBall = 10;
+        private const double maxOverlapWithBall = 10000;
 
         /// <summary>
         /// 小球和墙之间的嵌入阈值
@@ -83,7 +86,7 @@ namespace SpherePacking.MainWindow
         /// 小球在仿真过程中的最大速度
         /// 用于限幅
         /// </summary>
-        private double MaxVel = 50.0;
+        private double MaxVel = 20;
 
 
         #region 局部小球碰撞统计信息的相关变量
@@ -106,7 +109,7 @@ namespace SpherePacking.MainWindow
         {
             get
             {
-                return 2 * MaxVel * updateLocalBallsIndexIter * deltaT;
+                return 2 * MaxVel * updateLocalBallsIndexIter * DeltaT;
             }
         }
 
@@ -173,6 +176,12 @@ namespace SpherePacking.MainWindow
         private Matrix<double> energy;
 
         /// <summary>
+        /// 当前处于的迭代次数
+        /// 保存当前的迭代次数，方便重新导入模型时使用
+        /// </summary>
+        private int currIter = 0;
+
+        /// <summary>
         /// 小球三个方向上的速度是否需要衰减
         /// </summary>
         private Matrix<byte> shouldVelBeDecayed;
@@ -230,6 +239,11 @@ namespace SpherePacking.MainWindow
             get { return this.energy; }
             //private set { this.energy = value; }
         }
+
+        public int CurrIter
+        {
+            get { return currIter; }
+        }
         #endregion
 
         public ModelDem3D(SpherePlot balls, SimpleModelForSave sModel = null )
@@ -275,8 +289,7 @@ namespace SpherePacking.MainWindow
                 rtPos[i, 1] = balls.Spheres[i].GetCenter()[1];
                 rtPos[i, 2] = balls.Spheres[i].GetCenter()[2];
 
-                rtVel[i, 0] = MaxVel * (random.NextDouble() - 0.5);
-                rtVel[i, 1] = MaxVel * (random.NextDouble() - 0.5);
+                //给每个小球一个初始化向下的速度
                 rtVel[i, 2] = -MaxVel;
             }
             
@@ -292,20 +305,39 @@ namespace SpherePacking.MainWindow
         /// </summary>
         public void SolveProblem()
         {
-            
-
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            
-            for(int i=0;i<iteration;i++)
+
+            // find max velocity and acceleration of all balls
+            double maxV = 0, maxA = 0;
+            for (int j = 0; j < objNum; j++)
             {
+                if (maxV <= CvInvoke.Norm(rtVel.GetRow(j), Emgu.CV.CvEnum.NormType.L2))
+                    maxV = CvInvoke.Norm(rtVel.GetRow(j), Emgu.CV.CvEnum.NormType.L2);
+                if (maxA <= CvInvoke.Norm(rtAcc.GetRow(j), Emgu.CV.CvEnum.NormType.L2))
+                    maxA = CvInvoke.Norm(rtAcc.GetRow(j), Emgu.CV.CvEnum.NormType.L2);
+            }
+            MaxVel = maxV;
+            //开始求解时，会先找出所有小球的附近小球的下标
+            UpdateLocalBallsIndex();
+            
+            for(;currIter<iteration;currIter++)
+            {
+                //每隔100次，更新一下小球的附近小球的下标
+                if( currIter % 100 == 0 )
+                {
+                    UpdateLocalBallsIndex();
+                }
+                
                 shouldVelBeDecayed.SetValue(0);
                 //distances = CuteTools.ComputeMatDist(rtPos);
-                ComputeAcc(i);
+                ComputeAcc(currIter);
                 ComputeVel();
                 ComputePos();
                 //ComputeBounds();
-                double maxV = 0, maxA = 0;
+
+                //计算最大速度与加速度
+                maxV = 0; maxA = 0;
                 for (int j = 0; j < objNum; j++)
                 {
                     if (maxV <= CvInvoke.Norm(rtVel.GetRow(j), Emgu.CV.CvEnum.NormType.L2))
@@ -314,15 +346,16 @@ namespace SpherePacking.MainWindow
                         maxA = CvInvoke.Norm(rtAcc.GetRow(j), Emgu.CV.CvEnum.NormType.L2);
                 }
                 MaxVel = maxV;
+                
                 //porosity[i, 0] = ComputePorosity(1e0);
-                energy[i, 0] = ComputeEnergy();
+                energy[currIter, 0] = ComputeEnergy();
                 string s = String.Format("current iteration : {0:D4}, system energy : {1:F4}, elapsed time : {2} ms, max Vel is: {3}, max Acc is {4} .", 
-                                    i, energy[i,0], sw.ElapsedMilliseconds, maxV, maxA );
+                                    currIter, energy[currIter,0], sw.ElapsedMilliseconds, maxV, maxA );
                 log.Info( s );
                 //if( i % 20 == 0 )
                 if(true)
                 {
-                    RefreshHandler(i, rtPos);
+                    RefreshHandler(currIter, rtPos);
                 }
             }
 
@@ -395,12 +428,36 @@ namespace SpherePacking.MainWindow
                     {
                         ComputeAccForBall(i, ref force, iter);
                     }
+                    else
+                    {
+                        Console.WriteLine("2333");
+                    }
                 }
                 ApplySaturationAcc();
             }
             
         }
 
+        /// <summary>
+        /// 更新每个小球附近的小球的下标
+        /// 在每次迭代中会判断这些小球是否与该小球相交
+        /// 如果小球12和小球13相近，则只记录12的附近有13
+        /// </summary>
+        private void UpdateLocalBallsIndex()
+        {
+            for (int index = 0; index < objNum;index++ )
+            {
+                localBallsIndex[index].Clear();
+                for (int j = index + 1; j < objNum; j++)
+                {
+                    double dx = ComputeDx(index, j) - radii[j, 0] - radii[index, 0];
+                    if (dx < LocalBallsDistThreshold)
+                    {
+                        localBallsIndex[index].Add(j);
+                    }
+                }
+            }
+        }
         
         /// <summary>
         /// 计算下标为index的小球的加速度
@@ -453,7 +510,8 @@ namespace SpherePacking.MainWindow
                         }
                         else
                         {
-                            m = kns * (rtPos.GetRow(index) - rtPos.GetRow(j));
+                            m = rtPos.GetRow(index) - rtPos.GetRow(j);
+                            m = -dx * kns * m / CvInvoke.Norm(m, Emgu.CV.CvEnum.NormType.L2);
                             for (int k = 0; k < dim; k++)
                             {
                                 force[index, k] += m[0, k];
@@ -469,21 +527,6 @@ namespace SpherePacking.MainWindow
             //存储小球附近的小球信息，不去计算那些在短时间不会碰撞的小球的距离
             else
             {
-                
-                if( iter % updateLocalBallsIndexIter == 0 )
-                {
-                    localBallsIndex[index].Clear();
-                    for (int j = index + 1; j < objNum; j++)
-                    {
-                        double dx = ComputeDx(index, j) - radii[j, 0] - radii[index, 0];
-                        if( dx < LocalBallsDistThreshold )
-                        //if( true )
-                        {
-                            localBallsIndex[index].Add( j );
-                        }
-                    }
-                }
-
                 //for (int j = index + 1; j < objNum; j++)
                 //{
                 //    double dx = ComputeDx(index, j);
@@ -653,9 +696,9 @@ namespace SpherePacking.MainWindow
                 {
                     if( !beenSetToStill[i] )
                     {
-                        rtVel[i, 0] += rtAcc[i, 0] * deltaT;
-                        rtVel[i, 1] += rtAcc[i, 1] * deltaT;
-                        rtVel[i, 2] += rtAcc[i, 2] * deltaT;
+                        rtVel[i, 0] += rtAcc[i, 0] * DeltaT;
+                        rtVel[i, 1] += rtAcc[i, 1] * DeltaT;
+                        rtVel[i, 2] += rtAcc[i, 2] * DeltaT;
                     }
                 });
             }
@@ -665,9 +708,9 @@ namespace SpherePacking.MainWindow
                 {
                     if (!beenSetToStill[i])
                     {
-                        rtVel[i, 0] += rtAcc[i, 0] * deltaT;
-                        rtVel[i, 1] += rtAcc[i, 1] * deltaT;
-                        rtVel[i, 2] += rtAcc[i, 2] * deltaT;
+                        rtVel[i, 0] += rtAcc[i, 0] * DeltaT;
+                        rtVel[i, 1] += rtAcc[i, 1] * DeltaT;
+                        rtVel[i, 2] += rtAcc[i, 2] * DeltaT;
                     }
                 }
             }
@@ -686,9 +729,26 @@ namespace SpherePacking.MainWindow
                     {
                         if( !beenSetToStill[i] )
                         {
-                            rtPos[i, 0] += rtVel[i, 0] * deltaT;
-                            rtPos[i, 1] += rtVel[i, 1] * deltaT;
-                            rtPos[i, 2] += rtVel[i, 2] * deltaT;
+                            rtPos[i, 0] += rtVel[i, 0] * DeltaT;
+                            rtPos[i, 1] += rtVel[i, 1] * DeltaT;
+                            rtPos[i, 2] += rtVel[i, 2] * DeltaT;
+                            switch( PackingSystemSetting.SystemBoundType )
+                            {
+                                case BoundType.CylinderType:
+                                    double xy = Math.Sqrt( rtPos[i,0] * rtPos[i, 0] + rtPos[i, 1] * rtPos[i,1] );
+                                    if ( xy + radii[i, 0] >PackingSystemSetting.Radius )
+                                    {
+                                        rtPos[i, 0] = rtPos[i, 0] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
+                                        rtPos[i, 1] = rtPos[i, 1] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
+                                    }
+                                    rtPos[i, 2] = Math.Max(radii[i, 0], rtPos[i, 2]);
+                                    break;
+                                case BoundType.CubeType:
+                                    break;
+                                default:
+                                    break;
+                            }
+                            
                         }
                     });
             }
@@ -698,9 +758,9 @@ namespace SpherePacking.MainWindow
                 {
                     if (!beenSetToStill[i])
                     {
-                        rtPos[i, 0] += rtVel[i, 0] * deltaT;
-                        rtPos[i, 1] += rtVel[i, 1] * deltaT;
-                        rtPos[i, 2] += rtVel[i, 2] * deltaT;
+                        rtPos[i, 0] += rtVel[i, 0] * DeltaT;
+                        rtPos[i, 1] += rtVel[i, 1] * DeltaT;
+                        rtPos[i, 2] += rtVel[i, 2] * DeltaT;
                     }
                 }
             }
@@ -815,7 +875,7 @@ namespace SpherePacking.MainWindow
 
 
         /// <summary>
-        /// 更新小球的位置和半径信息
+        /// 更新小球的位置、半径和质量信息
         /// 当重新从文件中导入小球信息以后需要更新
         /// </summary>
         /// <param name="balls"></param>
@@ -824,9 +884,31 @@ namespace SpherePacking.MainWindow
             for(int i=0;i<balls.Spheres.Count();i++)
             {
                 radii[i, 0] = balls.Spheres[i].GetRadius();
+                mass[i, 0] = 4 / 3 * Math.PI * Math.Pow(radii[i, 0], 3);
                 rtPos[i, 0] = balls.Spheres[i].GetCenter()[0];
                 rtPos[i, 1] = balls.Spheres[i].GetCenter()[1];
                 rtPos[i, 2] = balls.Spheres[i].GetCenter()[2];
+            }
+        }
+
+        /// <summary>
+        /// 更新小球的位置、速度、角加速度、半径和质量信息
+        /// 导入文件时，利用重新生成的SimpleModelForSave类进行更新
+        /// </summary>
+        /// <param name="balls"></param>
+        public void UpdateBallInfo(SimpleModelForSave sModel)
+        {
+            currIter = sModel.currIter;
+            for (int i = 0; i < sModel.Radii.Rows;i++ )
+            {
+                radii[i, 0] = sModel.Radii[i, 0];
+                mass[i, 0] = 4 / 3 * Math.PI * Math.Pow(radii[i, 0], 3);
+                for(int j=0;j<sModel.RtPos.Cols;j++)
+                {
+                    rtPos[i, j] = sModel.RtPos[i, j];
+                    rtVel[i, j] = sModel.RtVel[i, j];
+                    rtAcc[i, j] = sModel.RtAcc[i, j];
+                }
             }
         }
 
@@ -945,6 +1027,11 @@ namespace SpherePacking.MainWindow
         public Matrix<double> RtVel;
 
         /// <summary>
+        /// 当前所处的迭代次数
+        /// </summary>
+        public int currIter;
+
+        /// <summary>
         /// 小球当前加速度
         /// </summary>
         public Matrix<double> RtAcc;
@@ -957,6 +1044,7 @@ namespace SpherePacking.MainWindow
                 this.RtPos = model.RtPos;
                 this.RtVel = model.RtVel;
                 this.RtAcc = model.RtAcc;
+                this.currIter = model.CurrIter;
             }
         }
     }

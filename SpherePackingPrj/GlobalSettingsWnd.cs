@@ -45,6 +45,7 @@ namespace SpherePacking.MainWindow
             tbResultsDir.Text = PackingSystemSetting.ResultDir;
             tbLogDir.Text = PackingSystemSetting.LogDir;
 
+            tbStepLength.Text = PackingSystemSetting.StepLength.ToString();
             tbBallsNumber.Text = PackingSystemSetting.BallsNumber.ToString();
             cbParticleSizeType.SelectedIndex = (int)PackingSystemSetting.ParticleSizeType;
             return res;
@@ -64,6 +65,7 @@ namespace SpherePacking.MainWindow
                 Convert.ToDouble(tbRadius.Text);
                 Convert.ToDouble(tbHeight.Text);
                 Convert.ToInt32( tbZRate.Text );
+                Convert.ToDouble( tbStepLength.Text );
 
                 PackingSystemSetting.SystemBoundType = (cbBoundType.SelectedIndex == 0) ? BoundType.CubeType : BoundType.CylinderType;
                 PackingSystemSetting.IterationNum = Convert.ToInt32(tbIterNumber.Text);
@@ -73,6 +75,7 @@ namespace SpherePacking.MainWindow
                 PackingSystemSetting.ResultDir = tbResultsDir.Text;
                 PackingSystemSetting.LogDir = tbLogDir.Text;
                 PackingSystemSetting.ParticleSizeType = (ActualSampleType)cbParticleSizeType.SelectedIndex;
+                PackingSystemSetting.StepLength = Convert.ToDouble( tbStepLength.Text );
                 switch (PackingSystemSetting.SystemBoundType)
                 {
                     case BoundType.CubeType:

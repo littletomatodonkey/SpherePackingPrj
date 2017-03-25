@@ -43,7 +43,7 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 产生随机数
         /// </summary>
-        private Random rnd = new Random();
+        private Random rnd = new Random((int)(DateTime.Now.Ticks / 900));
 
         public vtkSphereSource[] Spheres
         {
@@ -58,23 +58,120 @@ namespace SpherePacking.MainWindow
         /// </summary>
         public SpherePlot()
         {
-            switch( PackingSystemSetting.SystemBoundType )
+            InitializeSpheresPos();
+        }
+
+
+        /// <summary>
+        /// 初始小球的个数
+        /// 根据不同的系统边界条件进行小球位置和半径的初始化
+        /// 产生的小球在圆柱体边界条件下时，位置十分紧密，但是在立方体情况下，小球的致密程度相似
+        ///     newest method on 2017/03/25
+        /// </summary>
+        private void InitializeSpheresPos()
+        {
+            this.spheres = new vtkSphereSource[PackingSystemSetting.BallsNumber];
+            int index = 0;
+            int failCnt = 0;
+            //在一个平面内某个小球最大插入失败的次数，如果一个小球在800个随机产生的位置均没有被插入，则该层被铺满
+            int maxFailCnt = 800; 
+            // 当前层的高度（设置之后插入到该层的小球的Z值）
+            double thisLayerHeight = 0;
+            bool canBeAdded = true;
+            double rndR = 0.0, rndAngle = 0.0, rndXy = 0.0, x = 0.0, y = 0.0;
+            //该层最大的半径值（之后设置高度时会用到）
+            double thisLayerMaxRadius = 0.0;
+            //当当前层某个小球被插入失败的次数达到最大失败次数时，设置当前层为满，并将产生的位置添加到小球中
+            bool thisLayerFull = false;
+            List<double> listX = new List<double>();
+            List<double> listY = new List<double>();
+            List<double> listR = new List<double>();
+            while (index < PackingSystemSetting.BallsNumber)
             {
-                case BoundType.CubeType:
-                    InitializeSpheres(PackingSystemSetting.CubeLength / 2, PackingSystemSetting.CubeLength/2);
-                    break;
-                case BoundType.CylinderType:
-                    // need to be midified later...
-                    double len =  (PackingSystemSetting.Radius / Math.Sqrt(2) - 0.3);
-                    InitializeSpheres( len, 0 );
-                    break;
-                default:
-                    break;
+                for (int i = 0; i < listX.Count;i++ )
+                {
+                    spheres[index] = vtkSphereSource.New();
+                    spheres[index].SetRadius(listR[i]);
+                    spheres[index].SetCenter(listX[i], listY[i], thisLayerHeight);
+
+                    spheres[index].SetPhiResolution(20);
+                    spheres[index++].SetThetaResolution(20);
+
+                    if (index >= PackingSystemSetting.BallsNumber)
+                        break;
+                }
+                //为确保小球之间互相不重叠，这个值需要被设置为thisLayerMaxRadius，但是容易出现很大的孔隙
+                //  在这里设置为thisLayerMaxRadius/2，小球尽可能保持不重叠的基础上尽可能地致密
+                thisLayerHeight += thisLayerMaxRadius / 2;
+
+                listX.Clear();
+                listY.Clear();
+                listR.Clear();
+                thisLayerFull = false;
+                while( !thisLayerFull )
+                {
+                    failCnt = 0;
+                    rndR = ComputeRandomRadius(RandomType.RandomLogNormalType);
+                    if( PackingSystemSetting.SystemBoundType == BoundType.CylinderType )
+                    {
+                        rndXy = rnd.NextDouble() * (PackingSystemSetting.Radius - rndR);
+                        rndAngle = rnd.NextDouble() * 2 * Math.PI;
+                    }
+                    while (failCnt < maxFailCnt)
+                    {
+                        canBeAdded = true;
+                        if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
+                        {
+                            x = rndR + rnd.NextDouble() * (PackingSystemSetting.CubeLength - 2 * rndR);
+                            y = rndR + rnd.NextDouble() * (PackingSystemSetting.CubeLength  - 2 * rndR);
+                        }
+                        else if( PackingSystemSetting.SystemBoundType == BoundType.CylinderType )
+                        {
+                            x = rndXy * Math.Cos(rndAngle);
+                            y = rndXy * Math.Sin(rndAngle);
+                        }
+                        
+                        for (int i = 0; i < listX.Count; i++)
+                        {
+                            if ((listX[i] - x) * (listX[i] - x) + (listY[i] - y) * (listY[i] - y) < (listR[i] + rndR) * (listR[i] + rndR))
+                            {
+                                canBeAdded = false;
+                                break;
+                            }
+                        }
+                        // 只有小球被添加到该层中时，才会重新生成随机的半径，否则添加的小球的半径会偏小
+                        if (canBeAdded)
+                        {
+                            listX.Add(x);
+                            listY.Add(y);
+                            listR.Add(rndR);
+                            thisLayerMaxRadius = Math.Max(thisLayerMaxRadius, rndR);
+                            rndR = ComputeRandomRadius(RandomType.RandomLogNormalType);
+                            failCnt = 0;
+                        }
+                        else
+                        {
+                            failCnt++;
+                            if( PackingSystemSetting.SystemBoundType == BoundType.CylinderType )
+                            {
+                                rndXy = rnd.NextDouble() * (PackingSystemSetting.Radius - rndR);
+                                rndAngle = rnd.NextDouble() * 2 * Math.PI;
+                            }
+                        }
+                    }
+                    if (failCnt >= maxFailCnt)
+                    {
+                        thisLayerFull = true;
+                    }
+                }
+                //当前层的高度修正
+                thisLayerHeight += thisLayerMaxRadius;
             }
         }
 
         /// <summary>
         /// 初始化小球的位置和半径
+        ///     original method ----- 产生的小球的位置十分松散，耗费了大量的初始迭代时间
         /// </summary>
         /// <param name="len">立方体的边长的一半</param>
         /// <param name="offset">对于原圆柱体，底面圆心为零位；对于立方体，底面左下点为零位</param>

@@ -36,6 +36,8 @@
             this.label1 = new System.Windows.Forms.Label();
             this.tbResultsDir = new System.Windows.Forms.TextBox();
             this.gbModelInfo = new System.Windows.Forms.GroupBox();
+            this.cbParticleSizeType = new System.Windows.Forms.ComboBox();
+            this.label10 = new System.Windows.Forms.Label();
             this.tbZRate = new System.Windows.Forms.TextBox();
             this.label9 = new System.Windows.Forms.Label();
             this.tbBallsNumber = new System.Windows.Forms.TextBox();
@@ -54,8 +56,8 @@
             this.cbBoundType = new System.Windows.Forms.ComboBox();
             this.btnSaveInfo = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
-            this.label10 = new System.Windows.Forms.Label();
-            this.cbParticleSizeType = new System.Windows.Forms.ComboBox();
+            this.label11 = new System.Windows.Forms.Label();
+            this.tbStepLength = new System.Windows.Forms.TextBox();
             this.gbDirSettings.SuspendLayout();
             this.gbModelInfo.SuspendLayout();
             this.SuspendLayout();
@@ -135,6 +137,8 @@
             // 
             // gbModelInfo
             // 
+            this.gbModelInfo.Controls.Add(this.tbStepLength);
+            this.gbModelInfo.Controls.Add(this.label11);
             this.gbModelInfo.Controls.Add(this.cbParticleSizeType);
             this.gbModelInfo.Controls.Add(this.label10);
             this.gbModelInfo.Controls.Add(this.tbZRate);
@@ -159,6 +163,29 @@
             this.gbModelInfo.TabIndex = 1;
             this.gbModelInfo.TabStop = false;
             this.gbModelInfo.Text = "模型信息设置";
+            // 
+            // cbParticleSizeType
+            // 
+            this.cbParticleSizeType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cbParticleSizeType.FormattingEnabled = true;
+            this.cbParticleSizeType.Items.AddRange(new object[] {
+            "30~50um",
+            "50~70um",
+            "70~100um"});
+            this.cbParticleSizeType.Location = new System.Drawing.Point(118, 102);
+            this.cbParticleSizeType.Name = "cbParticleSizeType";
+            this.cbParticleSizeType.Size = new System.Drawing.Size(189, 20);
+            this.cbParticleSizeType.TabIndex = 26;
+            // 
+            // label10
+            // 
+            this.label10.AutoSize = true;
+            this.label10.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label10.Location = new System.Drawing.Point(20, 102);
+            this.label10.Name = "label10";
+            this.label10.Size = new System.Drawing.Size(91, 14);
+            this.label10.TabIndex = 25;
+            this.label10.Text = "小球粒径类型";
             // 
             // tbZRate
             // 
@@ -324,28 +351,22 @@
             this.btnCancel.Text = "取消";
             this.btnCancel.UseVisualStyleBackColor = true;
             // 
-            // label10
+            // label11
             // 
-            this.label10.AutoSize = true;
-            this.label10.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label10.Location = new System.Drawing.Point(20, 102);
-            this.label10.Name = "label10";
-            this.label10.Size = new System.Drawing.Size(91, 14);
-            this.label10.TabIndex = 25;
-            this.label10.Text = "小球粒径类型";
+            this.label11.AutoSize = true;
+            this.label11.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label11.Location = new System.Drawing.Point(328, 108);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(35, 14);
+            this.label11.TabIndex = 27;
+            this.label11.Text = "步长";
             // 
-            // cbParticleSizeType
+            // tbStepLength
             // 
-            this.cbParticleSizeType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cbParticleSizeType.FormattingEnabled = true;
-            this.cbParticleSizeType.Items.AddRange(new object[] {
-            "30~50um",
-            "50~70um",
-            "70~100um"});
-            this.cbParticleSizeType.Location = new System.Drawing.Point(118, 102);
-            this.cbParticleSizeType.Name = "cbParticleSizeType";
-            this.cbParticleSizeType.Size = new System.Drawing.Size(121, 20);
-            this.cbParticleSizeType.TabIndex = 26;
+            this.tbStepLength.Location = new System.Drawing.Point(406, 101);
+            this.tbStepLength.Name = "tbStepLength";
+            this.tbStepLength.Size = new System.Drawing.Size(72, 21);
+            this.tbStepLength.TabIndex = 28;
             // 
             // GlobalSettingsWnd
             // 
@@ -396,5 +417,7 @@
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.ComboBox cbParticleSizeType;
         private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.TextBox tbStepLength;
+        private System.Windows.Forms.Label label11;
     }
 }

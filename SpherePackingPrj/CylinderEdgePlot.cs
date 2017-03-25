@@ -34,57 +34,14 @@ namespace SpherePacking.MainWindow
 
         public void AddCylinderEdgeToActors(byte[] bgColor, ref vtkActorCollection actors)
         {
-            int numOfLine = 360;
-            vtkPoints points = vtkPoints.New();
-            for (int i = 0; i < 360*2; i += 360*2 / numOfLine)
-            {
-                points.InsertNextPoint(radius * Math.Cos(i * Math.PI / 180), radius * Math.Sin(i * Math.PI / 180), 0);
-                points.InsertNextPoint(radius * Math.Cos(i * Math.PI / 180), radius * Math.Sin(i * Math.PI / 180), height);
-            }
-
-            vtkPolyData pd = vtkPolyData.New();
-
-            vtkLine line = vtkLine.New();
-
-            vtkCellArray cellArr = vtkCellArray.New();
-
-            for (int i = 0; i < numOfLine / 2; i++)
-            {
-                line.GetPointIds().SetId(0, i * 2);
-                line.GetPointIds().SetId(1, i * 2 + 1);
-                cellArr.InsertNextCell(line);
-            }
-
-            IntPtr iColor = Marshal.AllocHGlobal(bgColor.Length);
-            Marshal.Copy(bgColor, 0, iColor, bgColor.Length);
-
-            vtkUnsignedCharArray colors = vtkUnsignedCharArray.New();
-
-            colors.SetNumberOfComponents(3);
-            for (int i = 0; i < cellArr.GetNumberOfCells(); i++)
-            {
-                colors.InsertNextTupleValue(iColor);
-            }
-
-            pd.SetPoints(points);
-            pd.SetLines(cellArr);
-            pd.GetCellData().SetScalars(colors);
-
-            vtkPolyDataMapper mapper = vtkPolyDataMapper.New();
-            mapper.SetInput(pd);
-            vtkActor actor = vtkActor.New();
-            actor.SetMapper(mapper);
-            actor.GetProperty().SetLineWidth(3);
-
-            Marshal.FreeHGlobal(iColor);
-
-            actors.AddItem( actor );
-
-
-
+            vtkProperty pp = vtkProperty.New();
+            pp.SetOpacity(0.7);
+            pp.SetColor(bgColor[0], bgColor[1], bgColor[2]);
+            pp.SetLineWidth(5);
+            pp.SetLighting(false);
 
             vtkRegularPolygonSource circle = vtkRegularPolygonSource.New();
-            circle.GeneratePolygonOff();
+            circle.GeneratePolygonOn();
             circle.SetNumberOfSides(50);
             circle.SetRadius(radius);
             circle.SetCenter(0, 0, 0);
@@ -92,27 +49,38 @@ namespace SpherePacking.MainWindow
             vtkPolyDataMapper mappper = vtkPolyDataMapper.New();
             mappper.SetInputConnection(circle.GetOutputPort());
             
-
-            vtkActor actor02 = vtkActor.New();
-            actor02.SetMapper(mappper);
-
+            vtkActor actor = vtkActor.New();
+            actor.SetProperty(pp);
+            actor.SetMapper(mappper);
             actors.AddItem(actor);
 
-            vtkRegularPolygonSource circle01 = vtkRegularPolygonSource.New();
+            actor.SetProperty( pp );
+            actors.AddItem( actor );
 
-            circle01.GeneratePolygonOff();
-            circle01.SetNumberOfSides(50);
-            circle01.SetRadius(radius);
-            circle01.SetCenter(0, 0, height);
 
-            vtkPolyDataMapper mappper01 = vtkPolyDataMapper.New();
-            mappper01.SetInputConnection(circle01.GetOutputPort());
+            vtkLineSource ls = vtkLineSource.New();
+            ls.SetPoint1( 0, 0, 0 );
+            ls.SetPoint2(0, 0, height);
+            vtkTubeFilter tf = vtkTubeFilter.New();
+            tf.SetInputConnection( ls.GetOutputPort() );
+            tf.SetRadius( radius );
+            tf.SetNumberOfSides( 100 );
+            tf.CappingOff();
 
-            vtkActor actor01 = vtkActor.New();
-            actor01.SetMapper(mappper01);
+            vtkPolyDataMapper dm = vtkPolyDataMapper.New();
+            dm.SetInputConnection( tf.GetOutputPort() );
+            
+            vtkActor a2 = vtkActor.New();
+            a2.SetMapper(dm);
 
-            actors.AddItem(actor01);
+            
+            
+            a2.SetProperty( pp );
 
+            pp.SetOpacity(0.5);
+            actor.SetProperty( pp );
+
+            actors.AddItem( a2 );
         }
 
 

@@ -107,9 +107,10 @@ namespace SpherePacking.MainWindow
         public static T LoadSimpleModelFromFile<T>( string fn )
         {
             T obj;
-            StreamReader sr = new StreamReader(fn);
+            StreamReader sr = null;
             try
             {
+                sr = new StreamReader(fn);
                 string str = sr.ReadToEnd();
                 obj = JsonConvert.DeserializeObject<T>(str);
             }
@@ -120,7 +121,8 @@ namespace SpherePacking.MainWindow
             }
             finally
             {
-                sr.Close();
+                if (sr != null)
+                    sr.Close();
             }
 
             

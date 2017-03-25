@@ -92,6 +92,12 @@ namespace SpherePacking.MainWindow
         public static bool IsVisualize = true;
 
         /// <summary>
+        /// 步长，一般设置为1e-4到5e-3之间
+        /// 越大，仿真速度越快，但系统容易震荡；越慢，系统稳定时间越长
+        /// </summary>
+        public static double StepLength = 4e-3;
+
+        /// <summary>
         /// 小球粒径类型
         /// </summary>
         public static ActualSampleType ParticleSizeType = ActualSampleType.FirstBatch30_50;
@@ -121,6 +127,8 @@ namespace SpherePacking.MainWindow
 
         public bool IsVisualize;
 
+        public double StepLength;
+
         public PackSysSettingForSave( )
         {
             this.Radius = PackingSystemSetting.Radius;
@@ -134,6 +142,7 @@ namespace SpherePacking.MainWindow
             this.LogDir = PackingSystemSetting.LogDir;
             this.LibDir = PackingSystemSetting.LibDir;
             this.IsVisualize = PackingSystemSetting.IsVisualize;
+            this.StepLength = PackingSystemSetting.StepLength;
         }
 
         /// <summary>
@@ -153,6 +162,7 @@ namespace SpherePacking.MainWindow
             PackingSystemSetting.LogDir = this.LogDir;
             PackingSystemSetting.LibDir = this.LibDir;
             PackingSystemSetting.IsVisualize = this.IsVisualize;
+            PackingSystemSetting.StepLength = this.StepLength;
             //if (PackingSystemSetting.Radius < 2)
             //{
             //    MessageBox.Show("在此设置半径最小值为2！");

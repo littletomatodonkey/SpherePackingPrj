@@ -386,7 +386,7 @@ namespace SpherePacking.MainWindow
 
             //标准参数应该是100，40
             CylinderEdgePlot plot = new CylinderEdgePlot(PackingSystemSetting.Radius, PackingSystemSetting.Height);
-            plot.AddCylinderEdgeToActors(new byte[] { 255, 0, 0 }, ref actorCollection);
+            plot.AddCylinderEdgeToActors(new byte[] { 0, 1, 1 }, ref actorCollection);
 
 
         }
@@ -625,11 +625,11 @@ namespace SpherePacking.MainWindow
             if (balls != null)
             {
                 DataReadWriteHelper.SaveObjAsJsonFile(new SimpleModelForSave(modelDem3D), String.Format("./result/ballsInfo{0}_{1}.json", PackingSystemSetting.SystemBoundType, DateTime.Now.ToString("yyyyMMdd-HHmmss")));
-                DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtPos);
-                DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtVel);
-                DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtAcc);
-                DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Radii);
-                DataReadWriteHelper.RecordInfo("energy" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Energy);
+                DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtPos, false);
+                DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtVel, false);
+                DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtAcc, false);
+                DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Radii, false);
+                DataReadWriteHelper.RecordInfo("energy" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Energy, false);
             }
             else
             {
@@ -677,7 +677,7 @@ namespace SpherePacking.MainWindow
                 if (sModel != null && sModel.Radii.Rows == balls.Spheres.Count())
                 {
                     balls.ReloadInfo(sModel);
-                    modelDem3D.UpdateBallInfo(balls);
+                    modelDem3D.UpdateBallInfo(sModel);
                     rwcVolumeDisp.Refresh();
                     string info = String.Format("import balls info from {0}, reload info successfully!", openFiledDlg.FileName);
                     log.Info(info);
