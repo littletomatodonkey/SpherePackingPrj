@@ -512,8 +512,15 @@ namespace SpherePacking.MainWindow
         {
             //CuteTools.ShowImageSeries(@"./humanThreeDim/H1010202__rec_dpn/final/%03d.bmp", 64, 64, 0, 63);
             Console.WriteLine( IsMainThread );
-            GenerateRandomNumber.TestLogNormalNumber();
-            
+            //GenerateRandomNumber.TestLogNormalNumber();
+
+
+            Matrix<double> a = new Matrix<double>(1, 3);
+            a[0, 0] = 1; a[0, 1] = 2; a[0, 2] = 3;
+            Matrix<double> b = new Matrix<double>(6, 3);
+            CvInvoke.Repeat(a, 6, 1, b);
+            a[0, 0] = 2; a[0, 1] = 3; a[0, 2] = 2;
+            Matrix<double> res =  CuteTools.ComputePointToPoints(a, b);
         }
 
         /// <summary>
@@ -530,7 +537,8 @@ namespace SpherePacking.MainWindow
             CvInvoke.Randn(pos, mean, stddev);
 
             stopWatch.Restart();
-            Matrix<double> dists = CuteTools.ComputeMatDist(pos);
+            Matrix<double> dists = new Matrix<double>( num, num );
+            CuteTools.ComputeMatDist(pos, ref dists);
             
             Console.WriteLine(stopWatch.ElapsedMilliseconds);
 

@@ -60,7 +60,7 @@ namespace SpherePacking.MainWindow
         /// 圆柱体边界时，值在1e2附近
         /// 
         /// </summary>
-        private double kns = 1e6;  //
+        private double kns = 5e6;  //
 
         /// <summary>
         /// 小球和墙碰撞时产生的力的比例因子
@@ -68,7 +68,7 @@ namespace SpherePacking.MainWindow
         /// 立方体边界时，值在1e2附近
         /// 圆柱体边界时，值在1e2附近
         /// </summary>
-        private const double knw = 1e6;
+        private const double knw = 2e6;
 
         /// <summary>
         /// 小球碰撞后的速度衰减指数
@@ -196,7 +196,7 @@ namespace SpherePacking.MainWindow
         /// 两两小球之间的距离矩阵，大小为onjNum X objNum
         ///     如果用这种存储所有距离数据的方法去计算小球的距离，小球个数大于3000多时，会内存溢出=·=
         /// </summary>
-        //private Matrix<double> distances;
+        private Matrix<double> distances;
 
         /// <summary>
         /// 用于产生随机数
@@ -279,7 +279,7 @@ namespace SpherePacking.MainWindow
             rtPos = new Matrix<double>(objNum, dim);
             rtVel = new Matrix<double>(objNum, dim);
             rtAcc = new Matrix<double>(objNum, dim);
-            //distances = new Matrix<double>(objNum, objNum);
+            distances = new Matrix<double>(objNum, objNum);
             energy = new Matrix<double>(iteration, 1);
             for (int i = 0; i < objNum; i++)
             {
@@ -292,7 +292,6 @@ namespace SpherePacking.MainWindow
                 //给每个小球一个初始化向下的速度
                 rtVel[i, 2] = -MaxVel;
             }
-            
             localBallsIndex = new List<List<int>>();
             for (int i = 0; i < objNum; i++)
                 localBallsIndex.Add(new List<int>());
@@ -318,22 +317,34 @@ namespace SpherePacking.MainWindow
                     maxA = CvInvoke.Norm(rtAcc.GetRow(j), Emgu.CV.CvEnum.NormType.L2);
             }
             MaxVel = maxV;
+
+            CuteTools.ComputeMatDist(rtPos, ref distances);
             //开始求解时，会先找出所有小球的附近小球的下标
             UpdateLocalBallsIndex();
-            
+
+            //Stopwatch siter = new Stopwatch();
             for(;currIter<iteration;currIter++)
             {
+                //siter.Restart();
+                CuteTools.ComputeMatDist(rtPos, ref distances);
+                //Console.WriteLine( "compute matreix dist: " + siter.ElapsedMilliseconds );
                 //每隔100次，更新一下小球的附近小球的下标
                 if( currIter % 100 == 0 )
                 {
+                    //siter.Restart();
                     UpdateLocalBallsIndex();
+                    //Console.WriteLine("update local balls index: " + siter.ElapsedMilliseconds);
                 }
-                
                 shouldVelBeDecayed.SetValue(0);
-                //distances = CuteTools.ComputeMatDist(rtPos);
+                //siter.Restart();
                 ComputeAcc(currIter);
+                //Console.WriteLine("compute acc: " + siter.ElapsedMilliseconds);
+                //siter.Restart();
                 ComputeVel();
+                //Console.WriteLine("compute vel: " + siter.ElapsedMilliseconds);
+                //siter.Restart();
                 ComputePos();
+                //Console.WriteLine("compute pos: " + siter.ElapsedMilliseconds);
                 //ComputeBounds();
 
                 //计算最大速度与加速度
@@ -348,7 +359,9 @@ namespace SpherePacking.MainWindow
                 MaxVel = maxV;
                 
                 //porosity[i, 0] = ComputePorosity(1e0);
+                //siter.Restart();
                 energy[currIter, 0] = ComputeEnergy();
+                //Console.WriteLine("compute energy: " + siter.ElapsedMilliseconds);
                 string s = String.Format("current iteration : {0:D4}, system energy : {1:F4}, elapsed time : {2} ms, max Vel is: {3}, max Acc is {4} .", 
                                     currIter, energy[currIter,0], sw.ElapsedMilliseconds, maxV, maxA );
                 log.Info( s );
@@ -430,7 +443,7 @@ namespace SpherePacking.MainWindow
                     }
                     else
                     {
-                        Console.WriteLine("2333");
+                        Console.WriteLine("warning : this ball has been set to be still...");
                     }
                 }
                 ApplySaturationAcc();
@@ -450,7 +463,8 @@ namespace SpherePacking.MainWindow
                 localBallsIndex[index].Clear();
                 for (int j = index + 1; j < objNum; j++)
                 {
-                    double dx = ComputeDx(index, j) - radii[j, 0] - radii[index, 0];
+                    //double dx = ComputeDx(index, j) - radii[j, 0] - radii[index, 0];
+                    double dx = distances[j, index] - radii[j, 0] - radii[index, 0];
                     if (dx < LocalBallsDistThreshold)
                     {
                         localBallsIndex[index].Add(j);
@@ -498,7 +512,8 @@ namespace SpherePacking.MainWindow
                 //由N*N的时间复杂度变为N*N/2，数量级没变，但是减少了几乎一半的运行时间
                 for (int j = index + 1; j < objNum; j++)
                 {
-                    double dx = ComputeDx(index, j) - radii[index, 0] - radii[j, 0];
+                    //double dx = ComputeDx(index, j) - radii[index, 0] - radii[j, 0];  // 
+                    double dx = distances[index, j] - radii[index, 0] - radii[j, 0];  // can be used if distance info be recorded
                     if (dx < 0)
                     {
                         //如果相交的部分超过限度，则设置两个小球为静止
@@ -553,7 +568,8 @@ namespace SpherePacking.MainWindow
 
                 for (int j = 0; j < localBallsIndex[index].Count; j++)
                 {
-                    double dx = ComputeDx(index, localBallsIndex[index][j]) - radii[index, 0] - radii[localBallsIndex[index][j], 0];
+                    //double dx = ComputeDx(index, localBallsIndex[index][j]) - radii[index, 0] - radii[localBallsIndex[index][j], 0];
+                    double dx = distances[index, localBallsIndex[index][j]] - radii[index, 0] - radii[localBallsIndex[index][j], 0];
                     if (dx < 0)
                     {
                         // 如果超过距离限度，则设置小球为静止
@@ -723,20 +739,73 @@ namespace SpherePacking.MainWindow
         /// </summary>
         private void ComputePos()
         {
-            if( PackingSystemSetting.IsParaCompute )
+            //Matrix<double> oldPos = new Matrix<double>( objNum, dim );
+            //rtPos.CopyTo( oldPos );
+            //for (int i = 0; i < objNum;i++ )
+            //{
+            //    bool acceptNewPos = true;
+            //    //将更新后的位置信息存储在临时的变量中
+            //    for (int j = 0; j < dim;j++ )
+            //        rtPos[i, j] += rtVel[i, j] * DeltaT;
+
+            //    switch (PackingSystemSetting.SystemBoundType)
+            //    {
+            //        case BoundType.CylinderType:
+            //            double xy = Math.Sqrt(rtPos[i, 0] * rtPos[i, 0] + rtPos[i, 1] * rtPos[i, 1]);
+            //            if (xy + radii[i, 0] > PackingSystemSetting.Radius || rtPos[i, 2] < radii[i, 0])
+            //            {
+            //                if (xy + radii[i, 0] > PackingSystemSetting.Radius)
+            //                {
+            //                    shouldVelBeDecayed[i, 0] = 1;
+            //                    shouldVelBeDecayed[i, 1] = 1;
+            //                }
+            //                else
+            //                    shouldVelBeDecayed[i, 2] = 1;
+            //                acceptNewPos = false;
+            //            }
+            //            break;
+            //        case BoundType.CubeType:
+            //            break;
+            //        default:
+            //            break;
+            //    }
+
+            //    if( acceptNewPos )
+            //    {
+            //        Matrix<double> dists = CuteTools.ComputePointToPoints(rtPos.GetRow(i), rtPos);
+            //        for (int j = 0; j < localBallsIndex[i].Count; j++)
+            //        {
+            //            if (dists[localBallsIndex[i][j], 0] < radii[i, 0] + radii[localBallsIndex[i][j], 0])
+            //            {
+            //                acceptNewPos = false;
+            //                break;
+            //            }
+            //        }
+            //    }
+            //    if (!acceptNewPos)
+            //    {
+            //        for (int j = 0; j < dim; j++)
+            //            rtPos[i, j] = oldPos[i, j];
+            //    }
+                
+            //}
+
+
+            //return;
+            if (PackingSystemSetting.IsParaCompute)
             {
                 Parallel.For(0, objNum, (i) =>
                     {
-                        if( !beenSetToStill[i] )
+                        if (!beenSetToStill[i])
                         {
                             rtPos[i, 0] += rtVel[i, 0] * DeltaT;
                             rtPos[i, 1] += rtVel[i, 1] * DeltaT;
                             rtPos[i, 2] += rtVel[i, 2] * DeltaT;
-                            switch( PackingSystemSetting.SystemBoundType )
+                            switch (PackingSystemSetting.SystemBoundType)
                             {
                                 case BoundType.CylinderType:
-                                    double xy = Math.Sqrt( rtPos[i,0] * rtPos[i, 0] + rtPos[i, 1] * rtPos[i,1] );
-                                    if ( xy + radii[i, 0] >PackingSystemSetting.Radius )
+                                    double xy = Math.Sqrt(rtPos[i, 0] * rtPos[i, 0] + rtPos[i, 1] * rtPos[i, 1]);
+                                    if (xy + radii[i, 0] > PackingSystemSetting.Radius)
                                     {
                                         rtPos[i, 0] = rtPos[i, 0] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
                                         rtPos[i, 1] = rtPos[i, 1] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
@@ -748,7 +817,7 @@ namespace SpherePacking.MainWindow
                                 default:
                                     break;
                             }
-                            
+
                         }
                     });
             }

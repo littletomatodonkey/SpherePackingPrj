@@ -183,13 +183,12 @@ namespace SpherePacking.MainWindow
         /// </summary>
         /// <param name="pos"></param>
         /// <returns></returns>
-        public static Matrix<double> ComputeMatDist( Matrix<double> pos )
+        public static void ComputeMatDist(Matrix<double> pos, ref Matrix<double> dists)
         {
             int num = pos.Rows;
-            Matrix<double> dists = new Matrix<double>(num, num);
             Matrix<double> xsquare = new Matrix<double>(num, pos.Cols);
             Matrix<double> xsquareSum = new Matrix<double>(num, 1);
-            
+            dists.SetZero();
             CvInvoke.Multiply(pos, pos, xsquare);
 
             for (int i = 0; i < pos.Cols;i++ )
@@ -200,7 +199,28 @@ namespace SpherePacking.MainWindow
             dists = dists + dists.Transpose();
             dists -= 2 * pos.Mul(pos.Transpose());
             CvInvoke.Sqrt(dists, dists);
-            return dists;
+        }
+
+        /// <summary>
+        /// 计算某个点到点集间的距离
+        /// </summary>
+        /// <param name="point"></param>
+        /// <param name="points"></param>
+        /// <returns></returns>
+        public static Matrix<double> ComputePointToPoints( Matrix<double> point, Matrix<double> points )
+        {
+            Matrix<double> tmpP = new Matrix<double>( points.Rows, points.Cols );
+            Matrix<double> res = new Matrix<double>(points.Rows, 1);
+            CvInvoke.Repeat( point, points.Rows, 1, tmpP );
+            tmpP -= points;
+            Matrix<double> tmpCol = new Matrix<double>(points.Rows, 1);
+            for (int i = 0; i < points.Cols;i++ )
+            {
+                CvInvoke.Multiply(tmpP.GetCol(i), tmpP.GetCol(i), tmpCol);
+                res += tmpCol;
+            }
+            CvInvoke.Sqrt(res, res);
+            return res;
         }
 
 
