@@ -56,25 +56,22 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 小球碰撞后相互之间产生的力的比例因子
         /// 力和小球之间的距离成正比
-        /// 立方体边界时，值在1e1附近
-        /// 圆柱体边界时，值在1e2附近
         /// 
         /// </summary>
-        private double kns = 5e6;  //
+        // private double kns = 5e3;  //
+        private double kns = 9.8e3;  //
 
         /// <summary>
         /// 小球和墙碰撞时产生的力的比例因子
         /// 在这里允许小球嵌入墙内一点，产生的力和嵌入的距离成正比
-        /// 立方体边界时，值在1e2附近
-        /// 圆柱体边界时，值在1e2附近
         /// </summary>
-        private const double knw = 2e6;
+        //private const double knw = 2e3 * 1.25*1.25*1.25;
+        private const double knw = 3.9e3;
 
         /// <summary>
         /// 小球碰撞后的速度衰减指数
         /// </summary>
-        private const double velDecayRate = 0.6;
-
+        private const double velDecayRate = 0.9;
 
         /// <summary>
         /// 小球在仿真过程中的最大加速度
@@ -87,7 +84,6 @@ namespace SpherePacking.MainWindow
         /// 用于限幅
         /// </summary>
         private double MaxVel = 20;
-
 
         #region 局部小球碰撞统计信息的相关变量
         /// <summary>
@@ -184,13 +180,8 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 小球三个方向上的速度是否需要衰减
         /// </summary>
-        private Matrix<byte> shouldVelBeDecayed;
+        private Matrix<double> shouldVelBeDecayed;
 
-        /// <summary>
-        /// 当小球被设置为静止状态时，该值为true，此时不再更新该小球的位置
-        ///     当两个小球之间相交的距离大于某个阈值时，这两个小球被设置为静止
-        /// </summary>
-        private bool[] beenSetToStill;
 
         /// <summary>
         /// 两两小球之间的距离矩阵，大小为onjNum X objNum
@@ -295,8 +286,7 @@ namespace SpherePacking.MainWindow
             localBallsIndex = new List<List<int>>();
             for (int i = 0; i < objNum; i++)
                 localBallsIndex.Add(new List<int>());
-            shouldVelBeDecayed = new Matrix<byte>(objNum, dim);
-            beenSetToStill = new bool[objNum];
+            shouldVelBeDecayed = new Matrix<double>(objNum, dim);
         }
 
         /// <summary>
@@ -358,7 +348,6 @@ namespace SpherePacking.MainWindow
                 }
                 MaxVel = maxV;
                 
-                //porosity[i, 0] = ComputePorosity(1e0);
                 //siter.Restart();
                 energy[currIter, 0] = ComputeEnergy();
                 //Console.WriteLine("compute energy: " + siter.ElapsedMilliseconds);
@@ -372,11 +361,10 @@ namespace SpherePacking.MainWindow
                 }
             }
 
-            DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt",PackingSystemSetting.ResultDir, rtPos);
+            DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt",PackingSystemSetting.ResultDir, rtPos * PackingSystemSetting.ResolutionUmPerSysUnit);
             DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, rtVel);
             DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, rtAcc);
-            DataReadWriteHelper.RecordInfo("porosity" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, porosity);
-            DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, radii);
+            DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, radii * PackingSystemSetting.ResolutionUmPerSysUnit);
             DataReadWriteHelper.RecordInfo("energy" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".txt", PackingSystemSetting.ResultDir, energy);
 
             sw.Stop();
@@ -437,16 +425,9 @@ namespace SpherePacking.MainWindow
             {
                 for (int i = 0; i < objNum; i++)
                 {
-                    if( !beenSetToStill[i] )
-                    {
-                        ComputeAccForBall(i, ref force, iter);
-                    }
-                    else
-                    {
-                        Console.WriteLine("warning : this ball has been set to be still...");
-                    }
+                    ComputeAccForBall(i, ref force, iter);
                 }
-                ApplySaturationAcc();
+                //ApplySaturationAcc();
             }
             
         }
@@ -516,25 +497,15 @@ namespace SpherePacking.MainWindow
                     double dx = distances[index, j] - radii[index, 0] - radii[j, 0];  // can be used if distance info be recorded
                     if (dx < 0)
                     {
-                        //如果相交的部分超过限度，则设置两个小球为静止
-                        if (dx < -maxOverlapWithBall)
+                        m = rtPos.GetRow(index) - rtPos.GetRow(j);
+                        m = -dx * kns * m / CvInvoke.Norm(m, Emgu.CV.CvEnum.NormType.L2);
+                        for (int k = 0; k < dim; k++)
                         {
-                            beenSetToStill[j] = true;
-                            beenSetToStill[index] = true;
-                            log.Info(string.Format("balls of index {0} and {1} have been freezed!  their intersect distance is {2} ", j, index, dx));
-                        }
-                        else
-                        {
-                            m = rtPos.GetRow(index) - rtPos.GetRow(j);
-                            m = -dx * kns * m / CvInvoke.Norm(m, Emgu.CV.CvEnum.NormType.L2);
-                            for (int k = 0; k < dim; k++)
-                            {
-                                force[index, k] += m[0, k];
-                                force[j, k] -= m[0, k];
+                            force[index, k] += m[0, k];
+                            force[j, k] -= m[0, k];
 
-                                shouldVelBeDecayed[index, k] = 1;
-                                shouldVelBeDecayed[j, k] = 1;
-                            }
+                            shouldVelBeDecayed[index, k] = 1;
+                            shouldVelBeDecayed[j, k] = 1;
                         }
                     }
                 }
@@ -568,33 +539,21 @@ namespace SpherePacking.MainWindow
 
                 for (int j = 0; j < localBallsIndex[index].Count; j++)
                 {
-                    //double dx = ComputeDx(index, localBallsIndex[index][j]) - radii[index, 0] - radii[localBallsIndex[index][j], 0];
-                    double dx = distances[index, localBallsIndex[index][j]] - radii[index, 0] - radii[localBallsIndex[index][j], 0];
-                    if (dx < 0)
-                    {
-                        // 如果超过距离限度，则设置小球为静止
-                        if( dx < -maxOverlapWithBall )
-                        {
-                            beenSetToStill[index] = true;
-                            beenSetToStill[localBallsIndex[index][j]] = true;
-                            string info = string.Format("balls of index {0} and {1} have been freezed! their intersect distance is {2} ", localBallsIndex[index][j], index, dx);
-                            log.Info(info);
-                        }
-                        else
-                        {
-                            m = rtPos.GetRow(index) - rtPos.GetRow(localBallsIndex[index][j]);
-                            m = -dx * kns * m / CvInvoke.Norm(m, Emgu.CV.CvEnum.NormType.L2);
+                //double dx = ComputeDx(index, localBallsIndex[index][j]) - radii[index, 0] - radii[localBallsIndex[index][j], 0];
+                double dx = distances[index, localBallsIndex[index][j]] - radii[index, 0] - radii[localBallsIndex[index][j], 0];
+                if (dx < 0)
+                {
+                        m = rtPos.GetRow(index) - rtPos.GetRow(localBallsIndex[index][j]);
+                        m = -dx * kns * m / CvInvoke.Norm(m, Emgu.CV.CvEnum.NormType.L2);
 
-                            for (int k = 0; k < dim; k++)
-                            {
-                                force[index, k] += m[0, k];
-                                force[localBallsIndex[index][j], k] -= m[0, k];
+                        for (int k = 0; k < dim; k++)
+                        {
+                            force[index, k] += m[0, k];
+                            force[localBallsIndex[index][j], k] -= m[0, k];
 
-                                shouldVelBeDecayed[index, k] = 1;
-                                shouldVelBeDecayed[localBallsIndex[index][j], k] = 1;                            
-                            }
+                            shouldVelBeDecayed[index, k] = 1;
+                            shouldVelBeDecayed[localBallsIndex[index][j], k] = 1;                            
                         }
-                        
                     }
                 }
 
@@ -627,6 +586,8 @@ namespace SpherePacking.MainWindow
                 {
                     force[index, 2] += knw * (-rtPos[index, 2] + radii[index, 0]);
                     shouldVelBeDecayed[index, 2] = 1;
+
+                    //rtVel[index, 2] = -rtVel[index, 2];
                 }
                 //高度限幅
                 //if (rtPos[i, 2] + radii[i, 0] > objNum/nBase/nBase)
@@ -655,11 +616,9 @@ namespace SpherePacking.MainWindow
                     //vx = rtVel[index, 0] * Math.Cos(rotAngle) + rtVel[index, 1] * Math.Sin(rotAngle);
                     //vy = -rtVel[index, 0] * Math.Sin(rotAngle) + rtVel[index, 1] * Math.Cos(rotAngle);
 
-                    ////圆心法线方向速度衰减
-                    ////vy = vy * velDecayRate;
-                    //vy = vy * velDecayRate;
+                    //vy = -vy ;
 
-                    ////将速度坐标轴变换回来
+                    //////将速度坐标轴变换回来
                     //rtVel[index, 0] = vx * Math.Cos(rotAngle) - vy * Math.Sin(rotAngle);
                     //rtVel[index, 1] = vx * Math.Sin(rotAngle) + vy * Math.Cos(rotAngle);
                 }
@@ -668,6 +627,7 @@ namespace SpherePacking.MainWindow
                 {
                     force[index, 2] += knw * (-rtPos[index, 2] + radii[index, 0]);
                     shouldVelBeDecayed[index, 2] = 1;
+                    //rtVel[index, 2] = -rtVel[index, 2];
                     //rtVel[index, 2] = rtVel[index, 2] * velDecayRate;
                 }
                 //高度限幅
@@ -695,14 +655,10 @@ namespace SpherePacking.MainWindow
             //CvInvoke.AccumulateProduct(,);
             Parallel.For(0, objNum, (i) =>
                 {
-                    //只有没有静止的小球被纳入到这个讨论当中
-                    if( !beenSetToStill[i] )
+                    for (int j = 0; j < 3; j++)
                     {
-                        for (int j = 0; j < 3; j++)
-                        {
-                            if (shouldVelBeDecayed[i, j] == 1)
-                                rtVel[i, j] *= velDecayRate;
-                        }
+                        if (shouldVelBeDecayed[i, j] == 1)
+                            rtVel[i, j] *= velDecayRate;
                     }
                 });
 
@@ -710,24 +666,18 @@ namespace SpherePacking.MainWindow
             {
                 Parallel.For(0, objNum, (i) =>
                 {
-                    if( !beenSetToStill[i] )
-                    {
-                        rtVel[i, 0] += rtAcc[i, 0] * DeltaT;
-                        rtVel[i, 1] += rtAcc[i, 1] * DeltaT;
-                        rtVel[i, 2] += rtAcc[i, 2] * DeltaT;
-                    }
+                    rtVel[i, 0] += rtAcc[i, 0] * DeltaT;
+                    rtVel[i, 1] += rtAcc[i, 1] * DeltaT;
+                    rtVel[i, 2] += rtAcc[i, 2] * DeltaT;
                 });
             }
             else
             {
                 for (int i = 0; i < objNum; i++)
                 {
-                    if (!beenSetToStill[i])
-                    {
-                        rtVel[i, 0] += rtAcc[i, 0] * DeltaT;
-                        rtVel[i, 1] += rtAcc[i, 1] * DeltaT;
-                        rtVel[i, 2] += rtAcc[i, 2] * DeltaT;
-                    }
+                    rtVel[i, 0] += rtAcc[i, 0] * DeltaT;
+                    rtVel[i, 1] += rtAcc[i, 1] * DeltaT;
+                    rtVel[i, 2] += rtAcc[i, 2] * DeltaT;
                 }
             }
 
@@ -796,28 +746,24 @@ namespace SpherePacking.MainWindow
             {
                 Parallel.For(0, objNum, (i) =>
                     {
-                        if (!beenSetToStill[i])
+                        rtPos[i, 0] += rtVel[i, 0] * DeltaT;
+                        rtPos[i, 1] += rtVel[i, 1] * DeltaT;
+                        rtPos[i, 2] += rtVel[i, 2] * DeltaT;
+                        switch (PackingSystemSetting.SystemBoundType)
                         {
-                            rtPos[i, 0] += rtVel[i, 0] * DeltaT;
-                            rtPos[i, 1] += rtVel[i, 1] * DeltaT;
-                            rtPos[i, 2] += rtVel[i, 2] * DeltaT;
-                            switch (PackingSystemSetting.SystemBoundType)
-                            {
-                                case BoundType.CylinderType:
-                                    double xy = Math.Sqrt(rtPos[i, 0] * rtPos[i, 0] + rtPos[i, 1] * rtPos[i, 1]);
-                                    if (xy + radii[i, 0] > PackingSystemSetting.Radius)
-                                    {
-                                        rtPos[i, 0] = rtPos[i, 0] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
-                                        rtPos[i, 1] = rtPos[i, 1] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
-                                    }
-                                    rtPos[i, 2] = Math.Max(radii[i, 0], rtPos[i, 2]);
-                                    break;
-                                case BoundType.CubeType:
-                                    break;
-                                default:
-                                    break;
-                            }
-
+                            case BoundType.CylinderType:
+                                double xy = Math.Sqrt(rtPos[i, 0] * rtPos[i, 0] + rtPos[i, 1] * rtPos[i, 1]);
+                                if (xy + radii[i, 0] > PackingSystemSetting.Radius)
+                                {
+                                    rtPos[i, 0] = rtPos[i, 0] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
+                                    rtPos[i, 1] = rtPos[i, 1] / xy * (PackingSystemSetting.Radius - radii[i, 0]);
+                                }
+                                rtPos[i, 2] = Math.Max(radii[i, 0], rtPos[i, 2]);
+                                break;
+                            case BoundType.CubeType:
+                                break;
+                            default:
+                                break;
                         }
                     });
             }
@@ -825,12 +771,9 @@ namespace SpherePacking.MainWindow
             {
                 for (int i = 0; i < objNum; i++)
                 {
-                    if (!beenSetToStill[i])
-                    {
-                        rtPos[i, 0] += rtVel[i, 0] * DeltaT;
-                        rtPos[i, 1] += rtVel[i, 1] * DeltaT;
-                        rtPos[i, 2] += rtVel[i, 2] * DeltaT;
-                    }
+                    rtPos[i, 0] += rtVel[i, 0] * DeltaT;
+                    rtPos[i, 1] += rtVel[i, 1] * DeltaT;
+                    rtPos[i, 2] += rtVel[i, 2] * DeltaT;
                 }
             }
             

@@ -13,32 +13,65 @@ namespace SpherePacking.MainWindow
     class PackingSystemSetting
     {
         /// <summary>
+        /// 小球的最大半径
+        /// </summary>
+        public static double MaxBallRadius = 0.5;
+
+        /// <summary>
         /// 圆柱体边界的半径
         /// 标准值是100
         /// </summary>
         public static double Radius = 5;
 
         /// <summary>
-        /// 圆柱体边界的高
+        /// 容器的高
         /// 标准值是40
         /// </summary>
         public static double Height = 4;
 
         /// <summary>
-        /// 立方体容器的边长
-        /// 小球的个数是CubeLength*CubeLength*CubeLength
+        /// 长方体容器的边长
+        /// 小球的个数是CubeLength*CubeLength*Height
         /// </summary>
-        public static int CubeLength = 3;
+        public static double CubeLength = 3;
 
         /// <summary>
         /// Z方向上的小球的个数与x、y方向上的小球的个数的比
         /// </summary>
-        public static int ZRate = 3;
+        public static double ZRate = 3;
+
+
+        /// <summary>
+        /// 系统的精度
+        /// 将该系统中的所有值乘以该值，得到的信息以像素为单位
+        /// 像素值/系统单位
+        /// </summary>
+        public static double ResolutionPixelPerSysUnit
+        {
+            get
+            {
+                return ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter / 
+                        (2 * MaxBallRadius) / ActualSampleParameter.PixelResolution;
+            }
+        }
+
+        /// <summary>
+        /// 系统精度
+        ///   用于小球将系统单位转化为以um为单位
+        ///   um/系统单位
+        /// </summary>
+        public static double ResolutionUmPerSysUnit
+        {
+            get
+            {
+                return ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter / (2 * MaxBallRadius) * 1e6;
+            }
+        }
 
         /// <summary>
         /// 所有小球的个数
-        /// 对于 立方体容器条件：
-        ///     BallsNumber = Z_RATE * CubeLength * CubeLength * CubeLength;
+        /// 对于 长方体容器条件：
+        ///     BallsNumber = Z_RATE * CubeLength * CubeLength * Height;
         /// 对于 圆柱体容器条件：
         ///     BallsNumber = 2 * Radius * Radius * Height * Z_RATE ;
         /// </summary>
@@ -47,7 +80,7 @@ namespace SpherePacking.MainWindow
             get
             {
                 return ( SystemBoundType == BoundType.CubeType )?
-                                (ZRate * CubeLength * CubeLength * CubeLength):
+                                ((int)(ZRate * CubeLength * CubeLength * Height)):
                                 ((int)(2*Radius*Radius*Height*ZRate));
             }
         }
@@ -55,7 +88,7 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 模型求解时的迭代次数
         /// </summary>
-        public static int IterationNum = 2000;
+        public static int IterationNum = 10000;
 
         /// <summary>
         /// 是否采用并行计算，在for循环的时候或许可以加快运算速度呢
@@ -109,9 +142,9 @@ namespace SpherePacking.MainWindow
 
         public double Height;
 
-        public int CubeLength;
+        public double CubeLength;
 
-        public int Z_RATE;
+        public double Z_RATE;
 
         public int BallsNumber;
 

@@ -31,7 +31,6 @@ namespace SpherePacking.MainWindow
             this.height = height;
         }
 
-
         public void AddCylinderEdgeToActors(byte[] bgColor, ref vtkActorCollection actors)
         {
             vtkProperty pp = vtkProperty.New();
@@ -73,8 +72,6 @@ namespace SpherePacking.MainWindow
             vtkActor a2 = vtkActor.New();
             a2.SetMapper(dm);
 
-            
-            
             a2.SetProperty( pp );
 
             pp.SetOpacity(0.5);

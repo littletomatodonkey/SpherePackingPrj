@@ -64,7 +64,7 @@ namespace SpherePacking.MainWindow
         /// </summary>
         public static void TestLogNormalNumber()
         {
-            int num = 50000;
+            int num = 10000;
             double min = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MinDiameter;
             double max = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter;
             double mu = ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].LogMiu;
@@ -76,7 +76,7 @@ namespace SpherePacking.MainWindow
             }
 
             MCvScalar s = CvInvoke.Mean(m);
-            DataReadWriteHelper.RecordInfo("data.txt", @"D:\MyDesktop\", m, false);
+            DataReadWriteHelper.RecordInfo("data.txt", @"D:\MyDesktop\", m * 1e6, false);
             Console.WriteLine( "random log normal number generation test : {0}", s.V0);
 
         }

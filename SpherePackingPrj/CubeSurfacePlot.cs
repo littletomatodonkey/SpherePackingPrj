@@ -16,14 +16,14 @@ namespace SpherePacking.MainWindow
         /// <summary>
         /// 立方体的边长
         /// </summary>
-        private int sideLen;
+        private double sideLen;
 
         /// <summary>
         /// 立方体的offset
         /// </summary>
         private double[] offset;
 
-        public CubeSurfacePlot(int len)
+        public CubeSurfacePlot(double len)
         {
             this.sideLen = len;
             this.offset = new double[3] {0, 0, 0 };

@@ -12,18 +12,9 @@ namespace SpherePacking.MainWindow
     class SpherePlot
     {
         /// <summary>
-        /// 小球的球心在每个网格点上的x、y、z每个单独方向上的最大偏移和最小偏移之差
-        /// 小球的半径的最大值 Rmax = 0.5 - MaxCenterBias/2;
-        /// example : 
-        ///     网格点是(0,0,0)，则小球的球心的范围是(-0.1,-0.1,-0.1) ~ (0.1,0.1,0.1)
-        ///     小球的半径的最大值是 0.4
-        /// </summary>
-        private const double MaxCenterBias = 0.2;
-
-        /// <summary>
         /// 最大的半径
         /// </summary>
-        public double MaxRadius { get { return 0.5 - MaxCenterBias / 2; } }
+        public double MaxRadius { get { return PackingSystemSetting.MaxBallRadius; } }
         
         /// <summary>
         /// 小球的半径的最大偏差（相对于0.5）
@@ -52,6 +43,7 @@ namespace SpherePacking.MainWindow
                 return this.spheres;
             }
         }
+
 
         /// <summary>
         /// 初始化SpherePlot对象
@@ -169,57 +161,10 @@ namespace SpherePacking.MainWindow
             }
         }
 
-        /// <summary>
-        /// 初始化小球的位置和半径
-        ///     original method ----- 产生的小球的位置十分松散，耗费了大量的初始迭代时间
-        /// </summary>
-        /// <param name="len">立方体的边长的一半</param>
-        /// <param name="offset">对于原圆柱体，底面圆心为零位；对于立方体，底面左下点为零位</param>
-        private void InitializeSpheres(double len, double offset)
-        {
-            this.spheres = new vtkSphereSource[PackingSystemSetting.BallsNumber];
-            int index = 0;
-            double h = 0;
-            double min = -len;
-            double max = len;
-            double step = 0.5;
-            if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
-            {
-                max = PackingSystemSetting.CubeLength + min;
-            }
-
-            while (index < PackingSystemSetting.BallsNumber)
-            {
-                for (double i = min + offset; i < max + offset; i += step)
-                {
-                    for (double j = min + offset; j < max + offset; j += step)
-                    {
-                        spheres[index] = vtkSphereSource.New();
-                        spheres[index].SetRadius(ComputeRandomRadius(RandomType.RandomLogNormalType));
-                        spheres[index].SetCenter(i + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + step/2, 
-                                                 j + MaxCenterBias / 2 * (rnd.NextDouble() - 0.5) + step/2, 
-                                                 h + step/2);
-                        
-                        spheres[index].SetPhiResolution(20);
-                        spheres[index++].SetThetaResolution(20);
-
-                        if (index >= PackingSystemSetting.BallsNumber)
-                        {
-                            break;
-                        }
-                    }
-                    if (index >= PackingSystemSetting.BallsNumber)
-                    {
-                        break;
-                    }
-                }
-                h = h + step;
-            }
-        }
 
         /// <summary>
         /// 计算小球的半径
-        /// 小球的半径的最大值 Rmax = 0.5 - MaxCenterBias/2, 确保在一个单位1的立方体内不会重叠
+        /// 小球的半径的最大值 Rmax = 0.5
         /// 此处设置的是均匀随机分布，小球半径符合还可能符合对数正态分布等
         /// </summary>
         /// <returns></returns>
@@ -230,7 +175,7 @@ namespace SpherePacking.MainWindow
             switch( type )
             {
                 case RandomType.AverageRandomType:
-                    radius = GenerateRandomNumber.AverageRandom((0.5 - MaxCenterBias) * (0.5 - MaxCenterBias / 2) / 0.5, 0.5 * (0.5 - MaxCenterBias / 2)/0.5);
+                    radius = GenerateRandomNumber.AverageRandom(0.5 - MaxRadiusBias , 0.5 );
                     break;
                 case RandomType.RandomLogNormalType:
                     //第一批样品30~50um的的参数

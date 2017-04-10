@@ -61,15 +61,16 @@ namespace SpherePacking.MainWindow
             try
             {
                 Convert.ToInt32(tbIterNumber.Text);
-                Convert.ToInt32(tbCubeLength.Text);
+                Convert.ToDouble(tbCubeLength.Text);
                 Convert.ToDouble(tbRadius.Text);
                 Convert.ToDouble(tbHeight.Text);
-                Convert.ToInt32( tbZRate.Text );
+                Convert.ToDouble( tbZRate.Text );
                 Convert.ToDouble( tbStepLength.Text );
 
                 PackingSystemSetting.SystemBoundType = (cbBoundType.SelectedIndex == 0) ? BoundType.CubeType : BoundType.CylinderType;
                 PackingSystemSetting.IterationNum = Convert.ToInt32(tbIterNumber.Text);
-                PackingSystemSetting.ZRate = Convert.ToInt32( tbZRate.Text );
+                PackingSystemSetting.ZRate = Convert.ToDouble( tbZRate.Text );
+                PackingSystemSetting.Height = Convert.ToDouble(tbHeight.Text);
                 PackingSystemSetting.IsParaCompute = cbParaCompute.Checked;
                 PackingSystemSetting.IsVisualize = cbVisualize.Checked;
                 PackingSystemSetting.ResultDir = tbResultsDir.Text;
@@ -79,11 +80,10 @@ namespace SpherePacking.MainWindow
                 switch (PackingSystemSetting.SystemBoundType)
                 {
                     case BoundType.CubeType:
-                        PackingSystemSetting.CubeLength = Convert.ToInt32(tbCubeLength.Text);
+                        PackingSystemSetting.CubeLength = Convert.ToDouble(tbCubeLength.Text);
                         break;
                     case BoundType.CylinderType:
                         PackingSystemSetting.Radius = Convert.ToDouble(tbRadius.Text);
-                        PackingSystemSetting.Height = Convert.ToDouble(tbHeight.Text);
                         break;
                     default:
                         break;
@@ -161,6 +161,20 @@ namespace SpherePacking.MainWindow
                 }
             }
             return false;
+        }
+
+        private void cbParticleSizeType_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            double reso = ActualSampleParameter.ActualSampleParaDict[(ActualSampleType)(cbParticleSizeType.SelectedIndex)].MaxDiameter / 
+                    (2 * PackingSystemSetting.MaxBallRadius) / 1e-6;
+
+            tbResolution.Text = reso.ToString();
+
+        }
+
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            this.Close();
         }
     }
 }

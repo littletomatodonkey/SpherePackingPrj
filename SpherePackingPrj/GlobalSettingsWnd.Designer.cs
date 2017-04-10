@@ -36,6 +36,11 @@
             this.label1 = new System.Windows.Forms.Label();
             this.tbResultsDir = new System.Windows.Forms.TextBox();
             this.gbModelInfo = new System.Windows.Forms.GroupBox();
+            this.tbResolution = new System.Windows.Forms.TextBox();
+            this.label13 = new System.Windows.Forms.Label();
+            this.label12 = new System.Windows.Forms.Label();
+            this.tbStepLength = new System.Windows.Forms.TextBox();
+            this.label11 = new System.Windows.Forms.Label();
             this.cbParticleSizeType = new System.Windows.Forms.ComboBox();
             this.label10 = new System.Windows.Forms.Label();
             this.tbZRate = new System.Windows.Forms.TextBox();
@@ -56,8 +61,6 @@
             this.cbBoundType = new System.Windows.Forms.ComboBox();
             this.btnSaveInfo = new System.Windows.Forms.Button();
             this.btnCancel = new System.Windows.Forms.Button();
-            this.label11 = new System.Windows.Forms.Label();
-            this.tbStepLength = new System.Windows.Forms.TextBox();
             this.gbDirSettings.SuspendLayout();
             this.gbModelInfo.SuspendLayout();
             this.SuspendLayout();
@@ -70,9 +73,9 @@
             this.gbDirSettings.Controls.Add(this.label2);
             this.gbDirSettings.Controls.Add(this.label1);
             this.gbDirSettings.Controls.Add(this.tbResultsDir);
-            this.gbDirSettings.Location = new System.Drawing.Point(12, 177);
+            this.gbDirSettings.Location = new System.Drawing.Point(12, 201);
             this.gbDirSettings.Name = "gbDirSettings";
-            this.gbDirSettings.Size = new System.Drawing.Size(513, 106);
+            this.gbDirSettings.Size = new System.Drawing.Size(540, 106);
             this.gbDirSettings.TabIndex = 0;
             this.gbDirSettings.TabStop = false;
             this.gbDirSettings.Text = "文件夹设置";
@@ -137,6 +140,9 @@
             // 
             // gbModelInfo
             // 
+            this.gbModelInfo.Controls.Add(this.tbResolution);
+            this.gbModelInfo.Controls.Add(this.label13);
+            this.gbModelInfo.Controls.Add(this.label12);
             this.gbModelInfo.Controls.Add(this.tbStepLength);
             this.gbModelInfo.Controls.Add(this.label11);
             this.gbModelInfo.Controls.Add(this.cbParticleSizeType);
@@ -159,10 +165,55 @@
             this.gbModelInfo.Controls.Add(this.cbBoundType);
             this.gbModelInfo.Location = new System.Drawing.Point(12, 25);
             this.gbModelInfo.Name = "gbModelInfo";
-            this.gbModelInfo.Size = new System.Drawing.Size(513, 130);
+            this.gbModelInfo.Size = new System.Drawing.Size(540, 157);
             this.gbModelInfo.TabIndex = 1;
             this.gbModelInfo.TabStop = false;
             this.gbModelInfo.Text = "模型信息设置";
+            // 
+            // tbResolution
+            // 
+            this.tbResolution.Location = new System.Drawing.Point(87, 127);
+            this.tbResolution.Name = "tbResolution";
+            this.tbResolution.ReadOnly = true;
+            this.tbResolution.Size = new System.Drawing.Size(146, 21);
+            this.tbResolution.TabIndex = 30;
+            // 
+            // label13
+            // 
+            this.label13.AutoSize = true;
+            this.label13.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label13.Location = new System.Drawing.Point(233, 134);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(287, 14);
+            this.label13.TabIndex = 29;
+            this.label13.Text = "将半径与位置乘以该值得到的结果以um为单位";
+            // 
+            // label12
+            // 
+            this.label12.AutoSize = true;
+            this.label12.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label12.Location = new System.Drawing.Point(18, 128);
+            this.label12.Name = "label12";
+            this.label12.Size = new System.Drawing.Size(63, 14);
+            this.label12.TabIndex = 29;
+            this.label12.Text = "小球精度";
+            // 
+            // tbStepLength
+            // 
+            this.tbStepLength.Location = new System.Drawing.Point(406, 101);
+            this.tbStepLength.Name = "tbStepLength";
+            this.tbStepLength.Size = new System.Drawing.Size(72, 21);
+            this.tbStepLength.TabIndex = 28;
+            // 
+            // label11
+            // 
+            this.label11.AutoSize = true;
+            this.label11.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
+            this.label11.Location = new System.Drawing.Point(328, 108);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(35, 14);
+            this.label11.TabIndex = 27;
+            this.label11.Text = "步长";
             // 
             // cbParticleSizeType
             // 
@@ -176,6 +227,7 @@
             this.cbParticleSizeType.Name = "cbParticleSizeType";
             this.cbParticleSizeType.Size = new System.Drawing.Size(189, 20);
             this.cbParticleSizeType.TabIndex = 26;
+            this.cbParticleSizeType.SelectedIndexChanged += new System.EventHandler(this.cbParticleSizeType_SelectedIndexChanged);
             // 
             // label10
             // 
@@ -325,7 +377,7 @@
             this.cbBoundType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cbBoundType.FormattingEnabled = true;
             this.cbBoundType.Items.AddRange(new object[] {
-            "立方体",
+            "长方体",
             "圆柱体"});
             this.cbBoundType.Location = new System.Drawing.Point(87, 20);
             this.cbBoundType.Name = "cbBoundType";
@@ -334,7 +386,7 @@
             // 
             // btnSaveInfo
             // 
-            this.btnSaveInfo.Location = new System.Drawing.Point(136, 289);
+            this.btnSaveInfo.Location = new System.Drawing.Point(136, 313);
             this.btnSaveInfo.Name = "btnSaveInfo";
             this.btnSaveInfo.Size = new System.Drawing.Size(75, 23);
             this.btnSaveInfo.TabIndex = 2;
@@ -344,29 +396,13 @@
             // 
             // btnCancel
             // 
-            this.btnCancel.Location = new System.Drawing.Point(257, 289);
+            this.btnCancel.Location = new System.Drawing.Point(257, 313);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(75, 23);
             this.btnCancel.TabIndex = 3;
             this.btnCancel.Text = "取消";
             this.btnCancel.UseVisualStyleBackColor = true;
-            // 
-            // label11
-            // 
-            this.label11.AutoSize = true;
-            this.label11.Font = new System.Drawing.Font("SimSun", 10.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.label11.Location = new System.Drawing.Point(328, 108);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(35, 14);
-            this.label11.TabIndex = 27;
-            this.label11.Text = "步长";
-            // 
-            // tbStepLength
-            // 
-            this.tbStepLength.Location = new System.Drawing.Point(406, 101);
-            this.tbStepLength.Name = "tbStepLength";
-            this.tbStepLength.Size = new System.Drawing.Size(72, 21);
-            this.tbStepLength.TabIndex = 28;
+            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
             // 
             // GlobalSettingsWnd
             // 
@@ -419,5 +455,8 @@
         private System.Windows.Forms.Label label10;
         private System.Windows.Forms.TextBox tbStepLength;
         private System.Windows.Forms.Label label11;
+        private System.Windows.Forms.TextBox tbResolution;
+        private System.Windows.Forms.Label label12;
+        private System.Windows.Forms.Label label13;
     }
 }

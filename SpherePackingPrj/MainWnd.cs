@@ -367,7 +367,7 @@ namespace SpherePacking.MainWindow
             balls.PlotSphereInRender(renderer, ref actorCollection);
 
             CubeEdgePlot edgePlot = new CubeEdgePlot(PackingSystemSetting.CubeLength, 2 * PackingSystemSetting.CubeLength);
-            edgePlot.AddContainerEdgeToActorCollection(new byte[] { 255, 0, 0 }, ref actorCollection);
+            edgePlot.AddContainerEdgeToActorCollection(new byte[] { 0, 1, 1 }, ref actorCollection);
 
             cubeSurfacePlot = new CubeSurfacePlot(PackingSystemSetting.CubeLength);
             //cubeSurfacePlot.PlotSurfaceAll(renderer);
@@ -513,14 +513,6 @@ namespace SpherePacking.MainWindow
             //CuteTools.ShowImageSeries(@"./humanThreeDim/H1010202__rec_dpn/final/%03d.bmp", 64, 64, 0, 63);
             Console.WriteLine( IsMainThread );
             //GenerateRandomNumber.TestLogNormalNumber();
-
-
-            Matrix<double> a = new Matrix<double>(1, 3);
-            a[0, 0] = 1; a[0, 1] = 2; a[0, 2] = 3;
-            Matrix<double> b = new Matrix<double>(6, 3);
-            CvInvoke.Repeat(a, 6, 1, b);
-            a[0, 0] = 2; a[0, 1] = 3; a[0, 2] = 2;
-            Matrix<double> res =  CuteTools.ComputePointToPoints(a, b);
         }
 
         /// <summary>
@@ -630,21 +622,24 @@ namespace SpherePacking.MainWindow
         /// <param name="e"></param>
         private void tmiSaveBallsInfo_Click(object sender, EventArgs e)
         {
+            string info = "";
             if (balls != null)
             {
                 DataReadWriteHelper.SaveObjAsJsonFile(new SimpleModelForSave(modelDem3D), String.Format("./result/ballsInfo{0}_{1}.json", PackingSystemSetting.SystemBoundType, DateTime.Now.ToString("yyyyMMdd-HHmmss")));
-                DataReadWriteHelper.RecordInfo("rePos" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtPos, false);
-                DataReadWriteHelper.RecordInfo("reVel" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtVel, false);
-                DataReadWriteHelper.RecordInfo("reAcc" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtAcc, false);
-                DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Radii, false);
+                DataReadWriteHelper.RecordInfo("rtPos" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtPos * PackingSystemSetting.ResolutionUmPerSysUnit, false);
+                DataReadWriteHelper.RecordInfo("rtVel" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtVel, false);
+                DataReadWriteHelper.RecordInfo("rtAcc" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.RtAcc, false);
+                DataReadWriteHelper.RecordInfo("radii" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Radii * PackingSystemSetting.ResolutionUmPerSysUnit, false);
                 DataReadWriteHelper.RecordInfo("energy" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt", PackingSystemSetting.ResultDir, modelDem3D.Energy, false);
+                info = "data write finished...";
+                log.Info( info );
             }
             else
             {
-                string warning = "balls is null now!!";
-                log.Warn(warning);
-                ShowText(warning, IsMainThread);
+                info = "balls is null now!!";
+                log.Warn(info);
             }
+            ShowText(info, IsMainThread);
         }
 
         /// <summary>
@@ -735,7 +730,8 @@ namespace SpherePacking.MainWindow
             }
             else if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
             {
-                m = Math.Sqrt(2) / 2;
+                //m = Math.Sqrt(2) / 2;
+                m = 1;
                 xmin = -PackingSystemSetting.Radius * m;
                 xmax = PackingSystemSetting.Radius * m;
 
@@ -760,13 +756,12 @@ namespace SpherePacking.MainWindow
             string dir = String.Format("{0}imgSlice/{1}/", PackingSystemSetting.ResultDir, DateTime.Now.ToString("yyyyMMddHHmmss"));
             Directory.CreateDirectory(dir);
 
-            double reso = 2 * balls.MaxRadius * ActualSampleParameter.PixelResolution / ActualSampleParameter.ActualSampleParaDict[PackingSystemSetting.ParticleSizeType].MaxDiameter;
-            string info = string.Format("the reso of the system is {0}, which all the radii are divided can get the images in pixels", reso);
+            string info = string.Format("the reso of the system is {0}, which all the radii are multiplied can get the images in pixels", PackingSystemSetting.ResolutionPixelPerSysUnit);
             Console.WriteLine();
             log.Info(info);
             Console.WriteLine(info);
 
-            ThreadStart ts = new ThreadStart(delegate { GenerateSlices(xmin, xmax, ymin, ymax, zmin, zmax, reso, dir + "{0:D4}.bmp"); });
+            ThreadStart ts = new ThreadStart(delegate { GenerateAndSaveSlices(xmin, xmax, ymin, ymax, zmin, zmax, PackingSystemSetting.ResolutionPixelPerSysUnit, dir + "{0:D4}.bmp"); });
             (new Thread(ts)
                 {
                     IsBackground = true,
@@ -842,7 +837,251 @@ namespace SpherePacking.MainWindow
 
         }
 
-        private void tmiComputePorosity_Click(object sender, EventArgs e)
+        /// <summary>
+        /// 计算系统沿Z轴方向的孔隙率分布
+        /// 注：这是计算了所有小球最高点的2/3处的孔隙率
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiComputeZaxisPorosity_Click(object sender, EventArgs e)
+        {
+            // 对图像进行降采样，即每隔这么多个像素对图像进行一次检测
+            double downSampleRate = 3;
+            //reso = reso * downSampleRate;
+            double zMeasureRate = 0.5;
+
+            double xmin = 0, xmax = 0, ymin = 0, ymax = 0, zmin = 0, zmax = 0;
+
+            if( PackingSystemSetting.SystemBoundType == BoundType.CubeType )
+            {
+                xmax = ymax = PackingSystemSetting.CubeLength;
+            }
+            else
+            {
+                xmin = ymin = -PackingSystemSetting.Radius;
+                xmax = ymax = -xmin;
+            }
+            double minV = 0.0, maxV = 0.0;
+            CvInvoke.MinMaxIdx(modelDem3D.RtPos.GetCol(2), out minV, out maxV, null, null);
+            zmax = maxV * zMeasureRate;
+
+            string info = string.Format( "computing porosity now, please do not do any other operations..." );
+            ShowText( info, IsMainThread );
+            log.Info(info);
+
+            //将耗时的操作放在线程里，防止界面卡死
+            ThreadStart ts = new ThreadStart(() =>
+            {
+                stopWatch.Restart();
+                int sizeX = (int)((xmax - xmin) * PackingSystemSetting.ResolutionPixelPerSysUnit / downSampleRate);
+                int sizeY = (int)((ymax - ymin) * PackingSystemSetting.ResolutionPixelPerSysUnit / downSampleRate);
+                int sizeZ = (int)((zmax - zmin) * PackingSystemSetting.ResolutionPixelPerSysUnit);
+
+                // new  method 处理100X100X100图像的时间约为1s
+                List<Matrix<byte>> pics = new List<Matrix<byte>>();
+                for (int i = 0; i < sizeZ; i++)
+                {
+                    pics.Add(new Matrix<byte>(sizeX, sizeY));
+                }
+
+                Parallel.For(0, PackingSystemSetting.BallsNumber, (n) =>
+                {
+                    int index_x_min = (int)(((modelDem3D.RtPos[n, 0] - modelDem3D.Radii[n, 0] - xmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit / downSampleRate) - 1;
+                    int index_x_max = (int)(((modelDem3D.RtPos[n, 0] + modelDem3D.Radii[n, 0] - xmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit / downSampleRate) + 1;
+                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - ymin)) * PackingSystemSetting.ResolutionPixelPerSysUnit / downSampleRate) - 1;
+                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - ymin)) * PackingSystemSetting.ResolutionPixelPerSysUnit / downSampleRate) + 1;
+                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - zmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) - 1;
+                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - zmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) + 1;
+                    index_x_min = index_x_min >= 0 ? index_x_min : 0;
+                    index_x_min = index_x_min <= sizeX ? index_x_min : sizeX;
+                    index_x_max = index_x_max >= 0 ? index_x_max : 0;
+                    index_x_max = index_x_max <= sizeX ? index_x_max : sizeX;
+
+                    index_y_min = index_y_min >= 0 ? index_y_min : 0;
+                    index_y_min = index_y_min <= sizeY ? index_y_min : sizeY;
+                    index_y_max = index_y_max >= 0 ? index_y_max : 0;
+                    index_y_max = index_y_max <= sizeY ? index_y_max : sizeY;
+
+                    index_z_min = index_z_min >= 0 ? index_z_min : 0;
+                    index_z_min = index_z_min <= sizeZ ? index_z_min : sizeZ;
+                    index_z_max = index_z_max >= 0 ? index_z_max : 0;
+                    index_z_max = index_z_max <= sizeZ ? index_z_max : sizeZ;
+
+                    for (int k = index_z_min; k < index_z_max; k++)
+                    {
+                        for (int i = index_x_min; i < index_x_max; i++)
+                        {
+                            for (int j = index_y_min; j < index_y_max; j++)
+                            {
+                                if (modelDem3D.IsPointInReferedSphere(xmin + i / PackingSystemSetting.ResolutionPixelPerSysUnit * downSampleRate, ymin + j / PackingSystemSetting.ResolutionPixelPerSysUnit * downSampleRate, zmin + k / PackingSystemSetting.ResolutionPixelPerSysUnit, n))
+                                {
+                                    pics[k][i, j] |= 255;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                Matrix<double> porosity = new Matrix<double>(sizeZ, 1);
+                for (int i = 0; i < porosity.Rows; i++)
+                {
+                    porosity[i, 0] = 1 - CvInvoke.CountNonZero(pics[i]) * 1.0 / (pics[i].Rows * pics[i].Cols);
+                }
+
+                // 如果是圆柱体边界
+                if (PackingSystemSetting.SystemBoundType == BoundType.CylinderType)
+                {
+                    porosity = 1 - (1 - porosity) * 4 / Math.PI;
+                }
+
+                string fn = "zaxis-porosity" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt";
+                DataReadWriteHelper.RecordInfo(fn, PackingSystemSetting.ResultDir, porosity, false);
+
+                info = string.Format("porosity has been computed... filename is {0}, and elapsed time is {1}ms", fn, stopWatch.ElapsedMilliseconds);
+                ShowText(info, IsMainThread);
+                log.Info(info);
+            });
+            
+            (new Thread(ts)
+            {
+                IsBackground = true,
+            }).Start();
+
+        }
+
+        /// <summary>
+        /// 针对圆柱体容器的情况，计算系统的径向孔隙率并保存成文本文件
+        /// 这里径向不能降采样，而沿Z轴降采样的话算法效率提升不高，因此没有降采样处理
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiRadialPorosity_Click(object sender, EventArgs e)
+        {
+            if (PackingSystemSetting.SystemBoundType == BoundType.CubeType)
+            {
+                MessageBox.Show("radial pososity can only be computed when cylinder bound type container...");
+                return;
+            }
+
+            //将耗时的操作放在线程里，防止界面卡死
+            ThreadStart ts = new ThreadStart(() =>
+            {
+                stopWatch.Restart();
+                //reso = reso * downSampleRate;
+                double zMeasureRate = 0.5;
+
+                double xmin = -PackingSystemSetting.Radius, xmax = -xmin, ymin = xmin, ymax = xmax, zmin = 0, zmax = 0;
+
+                double minV = 0.0, maxV = 0.0;
+                CvInvoke.MinMaxIdx(modelDem3D.RtPos.GetCol(2), out minV, out maxV, null, null);
+                zmax = maxV * zMeasureRate;
+
+                string info = string.Format("computing porosity now, please do not do any other operations...");
+                ShowText(info, IsMainThread);
+                log.Info(info);
+                Console.WriteLine(info);
+
+                int sizeR = (int)(PackingSystemSetting.Radius * PackingSystemSetting.ResolutionPixelPerSysUnit + 0.5);
+                int sizeX = 2 * sizeR + 1;
+                int sizeY = 2 * sizeR + 1;
+                int sizeZ = (int)((zmax - zmin) * PackingSystemSetting.ResolutionPixelPerSysUnit);
+
+                // new  method 处理100X100X100图像的时间约为1s
+                List<Matrix<byte>> pics = new List<Matrix<byte>>();
+                for (int i = 0; i < sizeZ; i++)
+                {
+                    pics.Add(new Matrix<byte>(sizeX, sizeY));
+                }
+
+                Parallel.For(0, PackingSystemSetting.BallsNumber, (n) =>
+                {
+                    int index_x_min = (int)(((modelDem3D.RtPos[n, 0] - modelDem3D.Radii[n, 0] - xmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) - 1;
+                    int index_x_max = (int)(((modelDem3D.RtPos[n, 0] + modelDem3D.Radii[n, 0] - xmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) + 1;
+                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - ymin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) - 1;
+                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - ymin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) + 1;
+                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - zmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) - 1;
+                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - zmin)) * PackingSystemSetting.ResolutionPixelPerSysUnit) + 1;
+                    index_x_min = index_x_min >= 0 ? index_x_min : 0;
+                    index_x_min = index_x_min <= sizeX ? index_x_min : sizeX;
+                    index_x_max = index_x_max >= 0 ? index_x_max : 0;
+                    index_x_max = index_x_max <= sizeX ? index_x_max : sizeX;
+
+                    index_y_min = index_y_min >= 0 ? index_y_min : 0;
+                    index_y_min = index_y_min <= sizeY ? index_y_min : sizeY;
+                    index_y_max = index_y_max >= 0 ? index_y_max : 0;
+                    index_y_max = index_y_max <= sizeY ? index_y_max : sizeY;
+
+                    index_z_min = index_z_min >= 0 ? index_z_min : 0;
+                    index_z_min = index_z_min <= sizeZ ? index_z_min : sizeZ;
+                    index_z_max = index_z_max >= 0 ? index_z_max : 0;
+                    index_z_max = index_z_max <= sizeZ ? index_z_max : sizeZ;
+
+                    for (int k = index_z_min; k < index_z_max; k++)
+                    {
+                        for (int i = index_x_min; i < index_x_max; i++)
+                        {
+                            for (int j = index_y_min; j < index_y_max; j++)
+                            {
+                                if (modelDem3D.IsPointInReferedSphere(xmin + i / PackingSystemSetting.ResolutionPixelPerSysUnit, ymin + j / PackingSystemSetting.ResolutionPixelPerSysUnit, zmin + k / PackingSystemSetting.ResolutionPixelPerSysUnit, n))
+                                {
+                                    pics[k][i, j] |= 255;
+                                }
+                            }
+                        }
+                    }
+                });
+
+
+                int[] solidPhaseNum = new int[sizeR];
+                int[] allPhaseNum = new int[sizeR];
+                Matrix<double> porosity = new Matrix<double>(sizeR, 1);
+
+
+                for (int ix = sizeR - sizeX; ix < sizeR; ix++)
+                {
+                    for (int iy = -(int)(Math.Sqrt(sizeR * sizeR - ix * ix)) - 1; iy < Math.Sqrt(sizeR * sizeR - ix * ix); iy++)
+                    {
+                        int r = (int)(0.5 + Math.Sqrt(ix * ix + iy * iy));
+                        if (r < sizeR)
+                        {
+                            for (int h = 0; h < sizeZ; h++)
+                            {
+                                if (pics[h][ix + sizeX - sizeR, iy + sizeY - sizeR] == 255)
+                                    solidPhaseNum[r]++;
+                            }
+                            allPhaseNum[r] += sizeZ;
+                        }
+                        //else
+                        //{
+                        //    Console.WriteLine( "radius greater than sizeX !!!" );
+                        //}
+                    }
+                }
+
+                for (int i = 0; i < sizeR; i++)
+                {
+                    porosity[i, 0] = 1 - 1.0 * solidPhaseNum[i] / allPhaseNum[i];
+                }
+                string fn = "radial-axis-porosity" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".txt";
+                DataReadWriteHelper.RecordInfo(fn, PackingSystemSetting.ResultDir, porosity, false);
+
+                info = string.Format("porosity has been computed... filename is {0}, and elapsed time is {1}ms", fn, stopWatch.ElapsedMilliseconds);
+                ShowText(info, IsMainThread);
+                log.Info(info);
+            });
+            (new Thread(ts)
+            {
+                IsBackground = true,
+            }).Start();
+
+        }
+
+        /// <summary>
+        /// 根据选中的图像的文件夹
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void tmiImageStackPorosity_Click(object sender, EventArgs e)
         {
             double porosity = 0.0;
             string text = "";
@@ -851,7 +1090,7 @@ namespace SpherePacking.MainWindow
             dlg.ShowDialog();
             dlg.Description = "请选择英文路径，否则无法读取图像";
             //ComputeParameters.ComputePorosity(@"D:\MyDesktop\sliceImg\", "{0:D4}.bmp", 10, 21, ref porosity);
-            if( !(dlg.SelectedPath.Length == 0) && ComputeParameters.ComputePorosity(dlg.SelectedPath, ref porosity, true))
+            if (!(dlg.SelectedPath.Length == 0) && ComputeParameters.ComputePorosity(dlg.SelectedPath, ref porosity, true))
             {
                 text = string.Format("chosen folder is {0}, porosity is {1:0.000000}", dlg.SelectedPath, porosity);
             }
@@ -860,7 +1099,7 @@ namespace SpherePacking.MainWindow
                 text = "folder not chosen...";
             }
             ShowText(text, IsMainThread);
-            log.Info( text );
+            log.Info(text);
         }
 
         private void tmiComputeTwoPointCorr_Click(object sender, EventArgs e)
@@ -891,7 +1130,7 @@ namespace SpherePacking.MainWindow
         /// <param name="zmax">zmax</param>
         /// <param name="reso">精度</param>
         /// <param name="fn">文件名</param>
-        private void GenerateSlices(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax, double reso, string fn)
+        private void GenerateAndSaveSlices(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax, double reso, string fn)
         {
             stopWatch.Restart();
 
@@ -900,9 +1139,9 @@ namespace SpherePacking.MainWindow
             log.Info(info);
             ShowText(info, IsMainThread);
 
-            int sizeX = (int)((xmax - xmin) / reso);
-            int sizeY = (int)((ymax - ymin) / reso);
-            int sizeZ = (int)((zmax - zmin) / reso);
+            int sizeX = (int)((xmax - xmin) * reso);
+            int sizeY = (int)((ymax - ymin) * reso);
+            int sizeZ = (int)((zmax - zmin) * reso);
 
 
             // new  method 处理100X100X100图像的时间约为1s
@@ -912,14 +1151,15 @@ namespace SpherePacking.MainWindow
                 pics.Add(new Matrix<byte>(sizeX, sizeY));
             }
 
+
             Parallel.For(0, PackingSystemSetting.BallsNumber, (n) =>
                 {
-                    int index_x_min = (int)(((modelDem3D.RtPos[n, 0] - modelDem3D.Radii[n, 0] - xmin)) / reso) - 1;
-                    int index_x_max = (int)(((modelDem3D.RtPos[n, 0] + modelDem3D.Radii[n, 0] - xmin)) / reso) + 1;
-                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - ymin)) / reso) - 1;
-                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - ymin)) / reso) + 1;
-                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - zmin)) / reso) - 1;
-                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - zmin)) / reso) + 1;
+                    int index_x_min = (int)(((modelDem3D.RtPos[n, 0] - modelDem3D.Radii[n, 0] - xmin)) * reso) - 1;
+                    int index_x_max = (int)(((modelDem3D.RtPos[n, 0] + modelDem3D.Radii[n, 0] - xmin)) * reso) + 1;
+                    int index_y_min = (int)(((modelDem3D.RtPos[n, 1] - modelDem3D.Radii[n, 0] - ymin)) * reso) - 1;
+                    int index_y_max = (int)(((modelDem3D.RtPos[n, 1] + modelDem3D.Radii[n, 0] - ymin)) * reso) + 1;
+                    int index_z_min = (int)(((modelDem3D.RtPos[n, 2] - modelDem3D.Radii[n, 0] - zmin)) * reso) - 1;
+                    int index_z_max = (int)(((modelDem3D.RtPos[n, 2] + modelDem3D.Radii[n, 0] - zmin)) * reso) + 1;
                     index_x_min = index_x_min >= 0 ? index_x_min : 0;
                     index_x_min = index_x_min <= sizeX ? index_x_min : sizeX;
                     index_x_max = index_x_max >= 0 ? index_x_max : 0;
@@ -941,7 +1181,7 @@ namespace SpherePacking.MainWindow
                         {
                             for (int j = index_y_min; j < index_y_max; j++)
                             {
-                                if (modelDem3D.IsPointInReferedSphere(xmin + i * reso, ymin + j * reso, zmin + k * reso, n))
+                                if (modelDem3D.IsPointInReferedSphere(xmin + i / reso, ymin + j / reso, zmin + k / reso, n))
                                 {
                                     pics[k][i, j] |= 255;
                                 }
@@ -1124,6 +1364,7 @@ namespace SpherePacking.MainWindow
         }
 
         
+
 
     }
 }

@@ -53,7 +53,9 @@
             this.tmiSimulateSinter = new System.Windows.Forms.ToolStripMenuItem();
             this.tmiVisualzieSlices = new System.Windows.Forms.ToolStripMenuItem();
             this.tmiComputeParameter = new System.Windows.Forms.ToolStripMenuItem();
+            this.tmiImageStackPorosity = new System.Windows.Forms.ToolStripMenuItem();
             this.tmiComputePorosity = new System.Windows.Forms.ToolStripMenuItem();
+            this.tmiRadialPorosity = new System.Windows.Forms.ToolStripMenuItem();
             this.tmiComputeTwoPointCorr = new System.Windows.Forms.ToolStripMenuItem();
             this.tmiComputeSurfaceArea = new System.Windows.Forms.ToolStripMenuItem();
             this.tmiComputeTortuosity = new System.Windows.Forms.ToolStripMenuItem();
@@ -125,42 +127,42 @@
             // 
             this.tmiImportBallsInfo.AccessibleDescription = "";
             this.tmiImportBallsInfo.Name = "tmiImportBallsInfo";
-            this.tmiImportBallsInfo.Size = new System.Drawing.Size(148, 22);
+            this.tmiImportBallsInfo.Size = new System.Drawing.Size(152, 22);
             this.tmiImportBallsInfo.Text = "导入小球信息";
             this.tmiImportBallsInfo.Click += new System.EventHandler(this.tmiImportBallsInfo_Click);
             // 
             // tmiSaveBallsInfo
             // 
             this.tmiSaveBallsInfo.Name = "tmiSaveBallsInfo";
-            this.tmiSaveBallsInfo.Size = new System.Drawing.Size(148, 22);
+            this.tmiSaveBallsInfo.Size = new System.Drawing.Size(152, 22);
             this.tmiSaveBallsInfo.Text = "保存小球信息";
             this.tmiSaveBallsInfo.Click += new System.EventHandler(this.tmiSaveBallsInfo_Click);
             // 
             // tmiSaveCurrentRenderer
             // 
             this.tmiSaveCurrentRenderer.Name = "tmiSaveCurrentRenderer";
-            this.tmiSaveCurrentRenderer.Size = new System.Drawing.Size(148, 22);
+            this.tmiSaveCurrentRenderer.Size = new System.Drawing.Size(152, 22);
             this.tmiSaveCurrentRenderer.Text = "保存当前图像";
             this.tmiSaveCurrentRenderer.Click += new System.EventHandler(this.tmiSaveCurrentRenderer_Click);
             // 
             // tmiGenerateImageSlices
             // 
             this.tmiGenerateImageSlices.Name = "tmiGenerateImageSlices";
-            this.tmiGenerateImageSlices.Size = new System.Drawing.Size(148, 22);
+            this.tmiGenerateImageSlices.Size = new System.Drawing.Size(152, 22);
             this.tmiGenerateImageSlices.Text = "生成切片";
             this.tmiGenerateImageSlices.Click += new System.EventHandler(this.tmiGenerateImageSlices_Click);
             // 
             // tmiSaveSettings
             // 
             this.tmiSaveSettings.Name = "tmiSaveSettings";
-            this.tmiSaveSettings.Size = new System.Drawing.Size(148, 22);
+            this.tmiSaveSettings.Size = new System.Drawing.Size(152, 22);
             this.tmiSaveSettings.Text = "保存配置信息";
             this.tmiSaveSettings.Click += new System.EventHandler(this.tmiSaveSettings_Click);
             // 
             // tmiExitSystem
             // 
             this.tmiExitSystem.Name = "tmiExitSystem";
-            this.tmiExitSystem.Size = new System.Drawing.Size(148, 22);
+            this.tmiExitSystem.Size = new System.Drawing.Size(152, 22);
             this.tmiExitSystem.Text = "退出";
             this.tmiExitSystem.Click += new System.EventHandler(this.tmiExitSystem_Click);
             // 
@@ -178,28 +180,28 @@
             // tmiSettings
             // 
             this.tmiSettings.Name = "tmiSettings";
-            this.tmiSettings.Size = new System.Drawing.Size(124, 22);
+            this.tmiSettings.Size = new System.Drawing.Size(152, 22);
             this.tmiSettings.Text = "设置";
             this.tmiSettings.Click += new System.EventHandler(this.tmiSettings_Click);
             // 
             // tmiPreference
             // 
             this.tmiPreference.Name = "tmiPreference";
-            this.tmiPreference.Size = new System.Drawing.Size(124, 22);
+            this.tmiPreference.Size = new System.Drawing.Size(152, 22);
             this.tmiPreference.Text = "偏好";
             this.tmiPreference.Click += new System.EventHandler(this.tmiPreference_Click);
             // 
             // tmiSolveProblem
             // 
             this.tmiSolveProblem.Name = "tmiSolveProblem";
-            this.tmiSolveProblem.Size = new System.Drawing.Size(124, 22);
+            this.tmiSolveProblem.Size = new System.Drawing.Size(152, 22);
             this.tmiSolveProblem.Text = "求解";
             this.tmiSolveProblem.Click += new System.EventHandler(this.tmiSolveProblem_Click);
             // 
             // tmiStopSolveProblem
             // 
             this.tmiStopSolveProblem.Name = "tmiStopSolveProblem";
-            this.tmiStopSolveProblem.Size = new System.Drawing.Size(124, 22);
+            this.tmiStopSolveProblem.Size = new System.Drawing.Size(152, 22);
             this.tmiStopSolveProblem.Text = "停止求解";
             this.tmiStopSolveProblem.Click += new System.EventHandler(this.tmiStopSolveProblem_Click);
             // 
@@ -237,7 +239,9 @@
             // tmiComputeParameter
             // 
             this.tmiComputeParameter.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tmiImageStackPorosity,
             this.tmiComputePorosity,
+            this.tmiRadialPorosity,
             this.tmiComputeTwoPointCorr,
             this.tmiComputeSurfaceArea,
             this.tmiComputeTortuosity});
@@ -245,31 +249,45 @@
             this.tmiComputeParameter.Size = new System.Drawing.Size(68, 21);
             this.tmiComputeParameter.Text = "参数计算";
             // 
+            // tmiImageStackPorosity
+            // 
+            this.tmiImageStackPorosity.Name = "tmiImageStackPorosity";
+            this.tmiImageStackPorosity.Size = new System.Drawing.Size(172, 22);
+            this.tmiImageStackPorosity.Text = "二值化图像孔隙率";
+            this.tmiImageStackPorosity.Click += new System.EventHandler(this.tmiImageStackPorosity_Click);
+            // 
             // tmiComputePorosity
             // 
             this.tmiComputePorosity.Name = "tmiComputePorosity";
-            this.tmiComputePorosity.Size = new System.Drawing.Size(148, 22);
-            this.tmiComputePorosity.Text = "孔隙率";
-            this.tmiComputePorosity.Click += new System.EventHandler(this.tmiComputePorosity_Click);
+            this.tmiComputePorosity.Size = new System.Drawing.Size(172, 22);
+            this.tmiComputePorosity.Text = "沿Z轴孔隙率";
+            this.tmiComputePorosity.Click += new System.EventHandler(this.tmiComputeZaxisPorosity_Click);
+            // 
+            // tmiRadialPorosity
+            // 
+            this.tmiRadialPorosity.Name = "tmiRadialPorosity";
+            this.tmiRadialPorosity.Size = new System.Drawing.Size(172, 22);
+            this.tmiRadialPorosity.Text = "径向孔隙率";
+            this.tmiRadialPorosity.Click += new System.EventHandler(this.tmiRadialPorosity_Click);
             // 
             // tmiComputeTwoPointCorr
             // 
             this.tmiComputeTwoPointCorr.Name = "tmiComputeTwoPointCorr";
-            this.tmiComputeTwoPointCorr.Size = new System.Drawing.Size(148, 22);
+            this.tmiComputeTwoPointCorr.Size = new System.Drawing.Size(172, 22);
             this.tmiComputeTwoPointCorr.Text = "两点相关函数";
             this.tmiComputeTwoPointCorr.Click += new System.EventHandler(this.tmiComputeTwoPointCorr_Click);
             // 
             // tmiComputeSurfaceArea
             // 
             this.tmiComputeSurfaceArea.Name = "tmiComputeSurfaceArea";
-            this.tmiComputeSurfaceArea.Size = new System.Drawing.Size(148, 22);
+            this.tmiComputeSurfaceArea.Size = new System.Drawing.Size(172, 22);
             this.tmiComputeSurfaceArea.Text = "比表面积";
             this.tmiComputeSurfaceArea.Click += new System.EventHandler(this.tmiComputeSurfaceArea_Click);
             // 
             // tmiComputeTortuosity
             // 
             this.tmiComputeTortuosity.Name = "tmiComputeTortuosity";
-            this.tmiComputeTortuosity.Size = new System.Drawing.Size(148, 22);
+            this.tmiComputeTortuosity.Size = new System.Drawing.Size(172, 22);
             this.tmiComputeTortuosity.Text = "迂曲度";
             this.tmiComputeTortuosity.Click += new System.EventHandler(this.tmiComputeTortuosity_Click);
             // 
@@ -396,6 +414,8 @@
         private System.Windows.Forms.ToolStripMenuItem tmiComputeTwoPointCorr;
         private System.Windows.Forms.ToolStripMenuItem tmiComputeSurfaceArea;
         private System.Windows.Forms.ToolStripMenuItem tmiComputeTortuosity;
+        private System.Windows.Forms.ToolStripMenuItem tmiRadialPorosity;
+        private System.Windows.Forms.ToolStripMenuItem tmiImageStackPorosity;
     }
 }
 
